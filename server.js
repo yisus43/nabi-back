@@ -13,16 +13,14 @@ const app = express();
 // ✅ AGREGAR ESTA LÍNEA (FALTABA):
 const PORT = process.env.PORT || 3000;
 
-// ✅ CORS MEJORADO
 app.use(cors({
   origin: [
+    'https://gentle-douhua-3750b2.netlify.app',  // ✅ TU URL DE NETLIFY
     'http://localhost:3000',
-    'http://localhost:3001', 
-    'http://localhost:5000',
-    'https://nabi-hotcakes.netlify.app',
+    'http://localhost:3001',
     'http://127.0.0.1:5500',
     'http://localhost:5500',
-    'file://'
+    'https://nabi-hotcakes.netlify.app'
   ],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
