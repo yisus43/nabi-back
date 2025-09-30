@@ -724,7 +724,51 @@
     });
     document.getElementById('extras').addEventListener('input', calcularPrecio);
 
-    // Envío del formulario - CON DEBUG
+    // FUNCIÓN MEJORADA DE ENVÍO CON PROXIES
+    async function enviarPedido(pedidoData) {
+        const BACKEND_URL = 'https://nabi-back.onrender.com/api/pedidos';
+        
+        // Múltiples opciones de envío
+        const URLS = [
+            BACKEND_URL, // Directo
+            'https://corsproxy.io/?' + encodeURIComponent(BACKEND_URL), // Proxy 1
+            'https://api.codetabs.com/v1/proxy?quest=' + encodeURIComponent(BACKEND_URL) // Proxy 2
+        ];
+        
+        console.log('🚀 Iniciando envío de pedido...');
+        
+        for (let i = 0; i < URLS.length; i++) {
+            try {
+                console.log(`🔄 Intentando opción ${i + 1}: ${URLS[i]}`);
+                
+                const response = await fetch(URLS[i], {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(pedidoData)
+                });
+                
+                console.log(`📡 Respuesta ${i + 1}:`, response.status);
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    console.log(`✅ Éxito con opción ${i + 1}`);
+                    return data;
+                } else {
+                    console.warn(`❌ Opción ${i + 1} falló con status:`, response.status);
+                }
+                
+            } catch (error) {
+                console.error(`❌ Error opción ${i + 1}:`, error.message);
+                // Continuar con la siguiente opción
+            }
+        }
+        
+        throw new Error('No se pudo conectar al servidor. Por favor, intenta más tarde.');
+    }
+
+    // Envío del formulario - CORREGIDO
     form.addEventListener('submit', async function(e) {
       e.preventDefault();
       
@@ -811,7 +855,7 @@
           submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Enviando...';
 
           // Datos para enviar al backend
-          const body = {
+          const pedidoData = {
             customer: customer,
             quantity: parseInt(quantity),
             package: package,
@@ -823,38 +867,18 @@
               Array.from(document.getElementById('topping').selectedOptions).map(o => o.value) : [],
             extras: extras,
             delivery: delivery,
-            punto: punto,
+            punto: delivery === 'punto' ? punto : '',
             vestimenta: vestimenta,
             phone: phone,
-            total: calcularPrecio()
+            total: calcularPrecio(),
+            timestamp: new Date().toISOString()
           };
 
-          console.log('🔴 [DEBUG] Datos del pedido:', body);
+          console.log('🔴 [DEBUG] Datos del pedido:', pedidoData);
           
-          // Enviar al backend
-          const API_BASE = 'https://nabi-back.onrender.com:10000/api/pedidos';
-          const URL = `${API_BASE}/pedidos`;
-          
-          console.log('🔴 [DEBUG] URL de envío:', URL);
-          
-          const response = await fetch(URL, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(body)
-          });
-
-          console.log('🔴 [DEBUG] Respuesta recibida:', response.status, response.statusText);
-          
-          if (!response.ok) {
-            const errorText = await response.text();
-            console.log('🔴 [DEBUG] Error del servidor:', errorText);
-            throw new Error(`Error del servidor: ${response.status} ${response.statusText}`);
-          }
-
-          const resultData = await response.json();
-          console.log('🔴 [DEBUG] Respuesta exitosa:', resultData);
+          // Enviar usando la función mejorada
+          const resultado = await enviarPedido(pedidoData);
+          console.log('🔴 [DEBUG] Respuesta exitosa:', resultado);
 
           // Éxito
           await Swal.fire({
