@@ -61,27 +61,37 @@ app.get('/health', (req, res) => {
   });
 });
 
-// 🔥 RUTAS DE AUTENTICACIÓN
+// 🔥 RUTAS DE AUTENTICACIÓN - CORREGIDA
 app.post('/api/auth/login', async (req, res) => {
   try {
-    const { email, password } = req.body;
+    console.log('🔐 SOLICITUD DE LOGIN RECIBIDA:', req.body);
+    
+    const { username, password } = req.body; // ✅ CAMBIADO: username no email
 
-    if (!email || !password) {
-      return res.status(400).json({ error: 'Email y contraseña son requeridos' });
+    console.log('👤 Username recibido:', username);
+
+    if (!username || !password) {
+      return res.status(400).json({ error: 'Username y contraseña son requeridos' });
     }
 
-    const user = await User.findOne({ email });
+    const user = await User.findOne({ username }); // ✅ CAMBIADO: buscar por username
+    console.log('👤 Usuario encontrado:', user ? 'Sí' : 'No');
+    
     if (!user) {
+      console.log('❌ Usuario no encontrado');
       return res.status(401).json({ error: 'Credenciales inválidas' });
     }
 
-    const isPasswordValid = await bcrypt.compare(password, user.password);
+    console.log('🔑 Comparando contraseña...');
+    const isPasswordValid = await bcrypt.compare(password, user.passwordHash); // ✅ CAMBIADO: passwordHash
+    console.log('✅ Contraseña válida:', isPasswordValid);
+    
     if (!isPasswordValid) {
       return res.status(401).json({ error: 'Credenciales inválidas' });
     }
 
     const token = jwt.sign(
-      { userId: user._id, email: user.email }, 
+      { userId: user._id, username: user.username }, // ✅ CAMBIADO: username
       process.env.JWT_SECRET || 'fallback_secret',
       { expiresIn: '24h' }
     );
@@ -91,8 +101,7 @@ app.post('/api/auth/login', async (req, res) => {
       token,
       user: {
         id: user._id,
-        email: user.email,
-        name: user.name
+        username: user.username, // ✅ CAMBIADO: username
       }
     });
 
@@ -115,7 +124,6 @@ app.post('/api/pedidos', async (req, res) => {
       });
     }
 
-    // ✅ CORREGIDO: Usar 'createdAt' en lugar de 'date'
     const orderData = {
       customer: customer.toString().trim(),
       quantity: parseInt(quantity),
@@ -129,8 +137,8 @@ app.post('/api/pedidos', async (req, res) => {
       vestimenta: vestimenta ? vestimenta.toString() : '',
       phone: phone.toString().trim(),
       total: parseFloat(total) || 0,
-      status: 'Pendiente', // ✅ Con P mayúscula
-      createdAt: new Date() // ✅ Campo correcto (no 'date')
+      status: 'Pendiente',
+      createdAt: new Date()
     };
 
     console.log('💾 Datos del pedido a guardar:', orderData);
@@ -157,7 +165,7 @@ app.post('/api/pedidos', async (req, res) => {
 // 🔥 RUTAS PROTEGIDAS (CON AUTENTICACIÓN PARA ADMIN)
 app.get('/api/pedidos', auth, async (req, res) => {
   try {
-    const orders = await Order.find().sort({ createdAt: -1 }); // ✅ Usar createdAt
+    const orders = await Order.find().sort({ createdAt: -1 });
     res.json(orders);
   } catch (error) {
     console.error('Error obteniendo pedidos:', error);
