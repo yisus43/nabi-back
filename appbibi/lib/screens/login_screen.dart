@@ -11,7 +11,7 @@ class LoginScreen extends StatefulWidget {
 
 class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _usernameController = TextEditingController(); // ✅ CAMBIADO
+  final _usernameController = TextEditingController();
   final _passwordController = TextEditingController();
   final _apiService = ApiService();
   bool _isLoading = false;
@@ -23,19 +23,32 @@ class _LoginScreenState extends State<LoginScreen> {
       });
 
       try {
+        print('🔄 INICIANDO LOGIN...'); // ✅ DEBUG
         final response = await _apiService.login(
-          _usernameController.text.trim(), // ✅ CAMBIADO
+          _usernameController.text.trim(),
           _passwordController.text,
         );
 
+        print('✅ LOGIN EXITOSO: $response'); // ✅ DEBUG
+
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString('token', response['token']);
-        await prefs.setString('userEmail', response['user']['username']); // ✅ CAMBIADO
+        await prefs.setString('userEmail', response['user']['username']);
+
+        print('🔐 TOKEN GUARDADO: ${response['token']}'); // ✅ DEBUG
+        print('👤 USERNAME GUARDADO: ${response['user']['username']}'); // ✅ DEBUG
+
+        // Verificar que se guardó
+        final savedToken = await prefs.getString('token');
+        final savedUser = await prefs.getString('userEmail');
+        print('📋 VERIFICACIÓN - Token: $savedToken, User: $savedUser'); // ✅ DEBUG
 
         if (mounted) {
+          print('🔄 NAVEGANDO A DASHBOARD...'); // ✅ DEBUG
           Navigator.pushReplacementNamed(context, '/dashboard');
         }
       } catch (e) {
+        print('❌ ERROR EN LOGIN: $e'); // ✅ DEBUG
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
@@ -97,17 +110,17 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                     const SizedBox(height: 32),
                     TextFormField(
-                      controller: _usernameController, // ✅ CAMBIADO
+                      controller: _usernameController,
                       decoration: InputDecoration(
-                        labelText: 'Username', // ✅ CAMBIADO
-                        prefixIcon: Icon(Icons.person, color: Colors.purple), // ✅ CAMBIADO
+                        labelText: 'Username',
+                        prefixIcon: Icon(Icons.person, color: Colors.purple),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(8),
                         ),
                       ),
                       validator: (value) {
                         if (value == null || value.isEmpty) {
-                          return 'Por favor ingresa tu username'; // ✅ CAMBIADO
+                          return 'Por favor ingresa tu username';
                         }
                         return null;
                       },
@@ -160,7 +173,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   void dispose() {
-    _usernameController.dispose(); // ✅ CAMBIADO
+    _usernameController.dispose();
     _passwordController.dispose();
     super.dispose();
   }
