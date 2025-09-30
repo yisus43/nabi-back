@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/api_service.dart';
+import 'dashboard_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -23,32 +24,35 @@ class _LoginScreenState extends State<LoginScreen> {
       });
 
       try {
-        print('🔄 INICIANDO LOGIN...'); // ✅ DEBUG
+        print('🔄 INICIANDO LOGIN...');
         final response = await _apiService.login(
           _usernameController.text.trim(),
           _passwordController.text,
         );
 
-        print('✅ LOGIN EXITOSO: $response'); // ✅ DEBUG
+        print('✅ LOGIN EXITOSO: $response');
 
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString('token', response['token']);
         await prefs.setString('userEmail', response['user']['username']);
 
-        print('🔐 TOKEN GUARDADO: ${response['token']}'); // ✅ DEBUG
-        print('👤 USERNAME GUARDADO: ${response['user']['username']}'); // ✅ DEBUG
+        print('🔐 TOKEN GUARDADO: ${response['token']}');
+        print('👤 USERNAME GUARDADO: ${response['user']['username']}');
 
-        // Verificar que se guardó
         final savedToken = await prefs.getString('token');
         final savedUser = await prefs.getString('userEmail');
-        print('📋 VERIFICACIÓN - Token: $savedToken, User: $savedUser'); // ✅ DEBUG
+        print('📋 VERIFICACIÓN - Token: $savedToken, User: $savedUser');
 
         if (mounted) {
-          print('🔄 NAVEGANDO A DASHBOARD...'); // ✅ DEBUG
-          Navigator.pushReplacementNamed(context, '/dashboard');
+          print('🔄 NAVEGANDO A DASHBOARD...');
+          Navigator.pushAndRemoveUntil(
+            context,
+            MaterialPageRoute(builder: (context) => const DashboardScreen()),
+            (route) => false,
+          );
         }
       } catch (e) {
-        print('❌ ERROR EN LOGIN: $e'); // ✅ DEBUG
+        print('❌ ERROR EN LOGIN: $e');
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(

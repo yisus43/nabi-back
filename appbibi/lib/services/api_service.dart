@@ -13,13 +13,13 @@ class ApiService {
     };
   }
 
-  Future<Map<String, dynamic>> login(String username, String password) async { // ✅ CAMBIADO
+  Future<Map<String, dynamic>> login(String username, String password) async {
     try {
       final response = await http.post(
         Uri.parse('$baseUrl/auth/login'),
         headers: {'Content-Type': 'application/json'},
         body: json.encode({
-          'username': username, // ✅ CAMBIADO: 'email' → 'username'
+          'username': username,
           'password': password,
         }),
       );
@@ -73,4 +73,4 @@ class ApiService {
       throw Exception('Error de conexión: $e');
     }
   }
-} 
+}

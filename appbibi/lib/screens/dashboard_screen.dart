@@ -68,7 +68,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
     try {
       await _apiService.updateOrderStatus(_token!, orderId, newStatus);
-      _loadOrders(); // Recargar lista
+      _loadOrders();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -95,7 +95,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
     await prefs.remove('userEmail');
     
     if (mounted) {
-      Navigator.pushReplacementNamed(context, '/');
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (context) => const LoginScreen()),
+        (route) => false,
+      );
     }
   }
 
