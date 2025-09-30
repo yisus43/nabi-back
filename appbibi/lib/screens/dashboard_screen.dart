@@ -3,6 +3,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:pull_to_refresh/pull_to_refresh.dart';
 import '../services/api_service.dart';
 import '../models/order_model.dart';
+import 'login_screen.dart'; // ✅ AGREGAR IMPORT
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -97,7 +98,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     if (mounted) {
       Navigator.pushAndRemoveUntil(
         context,
-        MaterialPageRoute(builder: (context) => const LoginScreen()),
+        MaterialPageRoute(builder: (context) => LoginScreen()), // ✅ CORREGIDO: sin 'const'
         (route) => false,
       );
     }
