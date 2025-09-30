@@ -396,91 +396,6 @@
   </style>
 </head>
 <body>
-  <script>
-    /*
-// 🔒 PROTECCIÓN MEJORADA - Sin interferir con el scroll
-document.addEventListener('DOMContentLoaded', function() {
-  // Prevenir clic derecho
-  document.addEventListener('contextmenu', function(e) {
-    e.preventDefault();
-    return false;
-  });
-  
-  // Prevenir selección de texto
-  document.addEventListener('selectstart', function(e) {
-    e.preventDefault();
-    return false;
-  });
-  
-  // Prevenir arrastrar imágenes
-  document.addEventListener('dragstart', function(e) {
-    e.preventDefault();
-    return false;
-  });
-  
-  // Prevenir copiar (Ctrl+C)
-  document.addEventListener('copy', function(e) {
-    e.preventDefault();
-    return false;
-  });
-  
-  // Prevenir cortar (Ctrl+X)
-  document.addEventListener('cut', function(e) {
-    e.preventDefault();
-    return false;
-  });
-  
-  // Prevenir pegar (Ctrl+V)
-  document.addEventListener('paste', function(e) {
-    e.preventDefault();
-    return false;
-  });
-  
-  // Prevenir F12, Ctrl+Shift+I, etc.
-  document.addEventListener('keydown', function(e) {
-    if (
-      e.key === "F12" ||
-      (e.ctrlKey && e.shiftKey && (e.key === "I" || e.key === "C" || e.key === "J")) ||
-      (e.ctrlKey && (e.key === "U" || e.key === "S")) ||
-      e.key === "PrintScreen"
-    ) {
-      e.preventDefault();
-      return false;
-    }
-  });
-  
-  // Detectar si la página está en un iframe (posible robo)
-  if (window.self !== window.top) {
-    document.body.innerHTML = '<div style="padding: 50px; text-align: center; color: red; font-size: 24px;">🚫 Acceso no autorizado</div>';
-    throw new Error('Acceso bloqueado');
-  }
-  
-  // 🔒 PROTECCIÓN MEJORADA - Solo elementos críticos
-  const criticalElements = ['head', 'script[src*="sweetalert"]', 'style'];
-  let originalState = {};
-  
-  criticalElements.forEach(selector => {
-    const element = document.querySelector(selector);
-    if (element) {
-      originalState[selector] = element.outerHTML;
-    }
-  });
-  
-  setInterval(() => {
-    criticalElements.forEach(selector => {
-      const currentElement = document.querySelector(selector);
-      if (currentElement && originalState[selector] !== currentElement.outerHTML) {
-        console.warn('⚠️ Elemento crítico modificado:', selector);
-        // Solo recargar si es realmente necesario (head modificado)
-        if (selector === 'head') {
-          window.location.reload();
-        }
-      }
-    });
-  }, 10000); // Revisar cada 10 segundos en lugar de 5
-});
-*/
-</script>
   <!-- Header -->
   <header>
     <div class="container nav-container">
@@ -809,9 +724,11 @@ document.addEventListener('DOMContentLoaded', function() {
     });
     document.getElementById('extras').addEventListener('input', calcularPrecio);
 
-    // Envío del formulario - CORREGIDO
+    // Envío del formulario - CON DEBUG
     form.addEventListener('submit', async function(e) {
       e.preventDefault();
+      
+      console.log('🔴 [DEBUG] Iniciando envío de pedido...');
       
       // Validaciones básicas
       const customer = document.getElementById('customer').value.trim();
@@ -825,6 +742,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
       // Validar campos requeridos
       if (!customer || !quantity || !package || !delivery || !vestimenta || !phone) {
+        console.log('🔴 [DEBUG] Faltan campos requeridos');
         Swal.fire({
           icon: 'warning',
           title: '¡Faltan datos!',
@@ -836,6 +754,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
       // CORRECCIÓN: Validar punto solo si es entrega en punto
       if (delivery === 'punto' && !punto) {
+        console.log('🔴 [DEBUG] Falta punto de entrega');
         Swal.fire({
           icon: 'warning',
           title: '¡Selecciona un punto!',
@@ -910,9 +829,15 @@ document.addEventListener('DOMContentLoaded', function() {
             total: calcularPrecio()
           };
 
+          console.log('🔴 [DEBUG] Datos del pedido:', body);
+          
           // Enviar al backend
           const API_BASE = 'https://nabi-back.onrender.com/api';
-          const response = await fetch(`${API_BASE}/pedidos`, {
+          const URL = `${API_BASE}/pedidos`;
+          
+          console.log('🔴 [DEBUG] URL de envío:', URL);
+          
+          const response = await fetch(URL, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -920,9 +845,16 @@ document.addEventListener('DOMContentLoaded', function() {
             body: JSON.stringify(body)
           });
 
+          console.log('🔴 [DEBUG] Respuesta recibida:', response.status, response.statusText);
+          
           if (!response.ok) {
-            throw new Error('Error en el servidor');
+            const errorText = await response.text();
+            console.log('🔴 [DEBUG] Error del servidor:', errorText);
+            throw new Error(`Error del servidor: ${response.status} ${response.statusText}`);
           }
+
+          const resultData = await response.json();
+          console.log('🔴 [DEBUG] Respuesta exitosa:', resultData);
 
           // Éxito
           await Swal.fire({
@@ -942,9 +874,10 @@ document.addEventListener('DOMContentLoaded', function() {
           priceDetails.textContent = 'El precio se calculará automáticamente';
 
         } catch (error) {
+          console.error('🔴 [DEBUG] Error completo:', error);
           await Swal.fire({
             title: 'Error ❌',
-            text: 'No se pudo enviar el pedido. Por favor intenta de nuevo.',
+            html: `No se pudo enviar el pedido.<br><small>Error: ${error.message}</small>`,
             icon: 'error',
             confirmButtonColor: '#e74c3c'
           });
@@ -969,7 +902,7 @@ document.addEventListener('DOMContentLoaded', function() {
       });
     });
 
-    console.log('✅ Página cargada correctamente - Con protección mejorada');
+    console.log('✅ Página cargada correctamente');
   </script>
 </body>
 </html>
