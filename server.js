@@ -15,7 +15,7 @@ const PORT = process.env.PORT || 3000;
 
 // ✅ CONFIGURACIÓN CORS SIMPLIFICADA - PERMITE TODO
 app.use(cors({
-  origin: "*",  // ✅ PERMITE CUALQUIER DOMINIO
+  origin: "*",
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
   allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'Origin']
 }));
@@ -66,24 +66,20 @@ app.post('/api/auth/login', async (req, res) => {
   try {
     const { email, password } = req.body;
 
-    // Validar campos
     if (!email || !password) {
       return res.status(400).json({ error: 'Email y contraseña son requeridos' });
     }
 
-    // Buscar usuario
     const user = await User.findOne({ email });
     if (!user) {
       return res.status(401).json({ error: 'Credenciales inválidas' });
     }
 
-    // Verificar contraseña
     const isPasswordValid = await bcrypt.compare(password, user.password);
     if (!isPasswordValid) {
       return res.status(401).json({ error: 'Credenciales inválidas' });
     }
 
-    // Generar token
     const token = jwt.sign(
       { userId: user._id, email: user.email }, 
       process.env.JWT_SECRET || 'fallback_secret',
@@ -113,15 +109,13 @@ app.post('/api/pedidos', async (req, res) => {
 
     const { customer, quantity, package, liquidos, frutas, toppings, extras, delivery, punto, vestimenta, phone, total } = req.body;
 
-    // Validaciones básicas
     if (!customer || !quantity || !package || !phone) {
       return res.status(400).json({ 
-        error: 'Campos requeridos: customer, quantity, package, phone',
-        received: req.body
+        error: 'Campos requeridos: customer, quantity, package, phone'
       });
     }
 
-    // CORREGIR: Crear pedido con la estructura correcta
+    // ✅ CORREGIDO: Usar 'createdAt' en lugar de 'date'
     const orderData = {
       customer: customer.toString().trim(),
       quantity: parseInt(quantity),
@@ -129,14 +123,14 @@ app.post('/api/pedidos', async (req, res) => {
       liquidos: Array.isArray(liquidos) ? liquidos : [],
       frutas: Array.isArray(frutas) ? frutas : [],
       toppings: Array.isArray(toppings) ? toppings : [],
-      extras: extras ? extras.toString() : '', // ✅ Convertir a string, no array
+      extras: extras ? extras.toString() : '',
       delivery: delivery ? delivery.toString() : 'recoger',
       punto: punto ? punto.toString() : '',
       vestimenta: vestimenta ? vestimenta.toString() : '',
       phone: phone.toString().trim(),
       total: parseFloat(total) || 0,
-      status: 'pendiente', // ✅ Cambiar de 'pending' a 'pendiente'
-      date: new Date()
+      status: 'Pendiente', // ✅ Con P mayúscula
+      createdAt: new Date() // ✅ Campo correcto (no 'date')
     };
 
     console.log('💾 Datos del pedido a guardar:', orderData);
@@ -154,11 +148,8 @@ app.post('/api/pedidos', async (req, res) => {
 
   } catch (error) {
     console.error('❌ Error creando pedido:', error);
-    console.error('📝 Stack trace:', error.stack);
     res.status(500).json({ 
-      error: 'Error al crear el pedido',
-      message: error.message,
-      details: process.env.NODE_ENV === 'development' ? error.stack : undefined
+      error: 'Error al crear el pedido: ' + error.message
     });
   }
 });
@@ -166,7 +157,7 @@ app.post('/api/pedidos', async (req, res) => {
 // 🔥 RUTAS PROTEGIDAS (CON AUTENTICACIÓN PARA ADMIN)
 app.get('/api/pedidos', auth, async (req, res) => {
   try {
-    const orders = await Order.find().sort({ date: -1 });
+    const orders = await Order.find().sort({ createdAt: -1 }); // ✅ Usar createdAt
     res.json(orders);
   } catch (error) {
     console.error('Error obteniendo pedidos:', error);
@@ -181,6 +172,13 @@ app.patch('/api/pedidos/:id', auth, async (req, res) => {
 
     if (!status) {
       return res.status(400).json({ error: 'Estado es requerido' });
+    }
+
+    const allowedStatus = ['Pendiente', 'Entregado', 'Cancelado'];
+    if (!allowedStatus.includes(status)) {
+      return res.status(400).json({ 
+        error: 'Estado inválido. Debe ser: Pendiente, Entregado o Cancelado' 
+      });
     }
 
     const updatedOrder = await Order.findByIdAndUpdate(
@@ -204,9 +202,9 @@ app.patch('/api/pedidos/:id', auth, async (req, res) => {
   }
 });
 
-// ✅ INICIAR SERVIDOR (CORREGIDO)
+// ✅ INICIAR SERVIDOR
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Servidor Nabi Backend iniciado en puerto ${PORT}`);
   console.log(`🌐 URL: http://localhost:${PORT}`);
-  console.log(`✅ CORS configurado para Netlify`);
+  console.log(`✅ CORS configurado`);
 });
