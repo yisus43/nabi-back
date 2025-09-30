@@ -10,25 +10,31 @@ const User = require('./models/user');
 const auth = require('./middleware/auth');
 const app = express();
 
-// ✅ CORS MEJORADO - Agrega esto
+// ✅ AGREGAR ESTA LÍNEA (FALTABA):
+const PORT = process.env.PORT || 3000;
+
+// ✅ CORS MEJORADO
 app.use(cors({
   origin: [
     'http://localhost:3000',
     'http://localhost:3001', 
     'http://localhost:5000',
     'https://nabi-hotcakes.netlify.app',
-    'http://127.0.0.1:5500',  // Live Server de VS Code
-    'http://localhost:5500',  // Live Server alternativo
-    'file://'                 // Archivos locales
+    'http://127.0.0.1:5500',
+    'http://localhost:5500',
+    'file://'
   ],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
-// ✅ CONEXIÓN MONGODB CON FALLBACK
+
+app.use(helmet());
+app.use(express.json());
+
+// ✅ CONEXIÓN MONGODB
 console.log('🔗 Intentando conectar a MongoDB...');
 
-// ✅ VALORES DIRECTOS como fallback - ELIMINA LA DEPENDENCIA DEL .env
 const mongoURI = process.env.MONGO_URI || process.env.MONGO_URL || 'mongodb+srv://nabi:naruto214356@cluster0.tcwy4hm.mongodb.net/PedidosDB?retryWrites=true&w=majority&appName=Cluster0';
 
 console.log('📦 URI MongoDB:', mongoURI ? '✅ Encontrada' : '❌ No encontrada');
@@ -38,7 +44,6 @@ if (!mongoURI) {
   process.exit(1);
 }
 
-// ✅ CONEXIÓN SIMPLIFICADA
 mongoose.connect(mongoURI)
 .then(() => {
   console.log('✅ MongoDB conectado exitosamente');
@@ -50,8 +55,6 @@ mongoose.connect(mongoURI)
 });
 
 // ================= RUTAS =================
-// ... (TUS RUTAS ACTUALES SE MANTIENEN IGUAL) ...
-
 app.get('/', (req, res) => {
   res.json({ 
     message: '🚀 API Nabi Backend funcionando!',
@@ -60,7 +63,6 @@ app.get('/', (req, res) => {
   });
 });
 
-// Health check
 app.get('/health', (req, res) => {
   res.status(200).json({ 
     status: 'OK', 
@@ -68,7 +70,22 @@ app.get('/health', (req, res) => {
   });
 });
 
-// ✅ TUS RUTAS ACTUALES AQUÍ (login, pedidos, etc.)
+// 🔥 AGREGA TUS RUTAS AQUÍ (login, pedidos, etc.)
+app.post('/api/auth/login', async (req, res) => {
+  // ... tu código de login ...
+});
+
+app.post('/api/pedidos', async (req, res) => {
+  // ... tu código de pedidos ...
+});
+
+app.get('/api/pedidos', auth, async (req, res) => {
+  // ... tu código para obtener pedidos ...
+});
+
+app.patch('/api/pedidos/:id', auth, async (req, res) => {
+  // ... tu código para actualizar pedidos ...
+});
 
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Servidor Nabi Backend iniciado en puerto ${PORT}`);
