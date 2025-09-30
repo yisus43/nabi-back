@@ -16,38 +16,22 @@ const PORT = process.env.PORT || 3000;
 // ✅ CONFIGURACIÓN CORS ROBUSTA
 app.use(cors({
   origin: function (origin, callback) {
-    // Permitir todos los orígenes durante desarrollo
-    if (!origin) return callback(null, true);
-    
-    const allowedOrigins = [
-      'http://localhost:3000',
-      'http://localhost:5000', 
-      'http://localhost:51988',
-      'http://localhost:52959',
-      'https://*.netlify.app',
-      'https://*.render.com',
-      'http://*.localhost'
-    ];
-    
-    if (allowedOrigins.indexOf(origin) !== -1 || !origin) {
-      callback(null, true);
-    } else {
-      callback(null, true); // Permitir todos temporalmente
-    }
+    // Permitir todos los orígenes
+    callback(null, true);
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH', 'HEAD'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'Origin', 'X-Requested-With', 'Access-Control-Allow-Origin']
+  allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'Origin', 'X-Requested-With']
 }));
 
-// ✅ MANEJAR PREFLIGHT CORS MANUALMENTE
+// ✅ MANEJAR PREFLIGHT CORS
 app.options('*', cors());
 
 app.use(helmet({
   crossOriginResourcePolicy: { policy: "cross-origin" }
 }));
 
-app.use(express.json());
+app.use(express.json({ limit: '10mb' }));
 
 // ✅ CONEXIÓN MONGODB
 console.log('🔗 Intentando conectar a MongoDB...');
@@ -137,16 +121,21 @@ app.post('/api/auth/login', async (req, res) => {
   }
 });
 
-// 🔥 RUTA PARA CREAR PEDIDOS
+// 🔥 RUTA PARA CREAR PEDIDOS - MEJORADA
 app.post('/api/pedidos', async (req, res) => {
   try {
-    console.log('📦 Recibiendo nuevo pedido:', JSON.stringify(req.body, null, 2));
+    console.log('📦 Recibiendo nuevo pedido...');
+    console.log('📊 Headers:', req.headers);
+    console.log('📝 Body:', req.body);
 
     const { customer, quantity, package, liquidos, frutas, toppings, extras, delivery, punto, vestimenta, phone, total } = req.body;
 
+    // Validaciones mejoradas
     if (!customer || !quantity || !package || !phone) {
+      console.log('❌ Campos faltantes:', { customer, quantity, package, phone });
       return res.status(400).json({ 
-        error: 'Campos requeridos: customer, quantity, package, phone'
+        error: 'Campos requeridos: customer, quantity, package, phone',
+        received: { customer, quantity, package, phone }
       });
     }
 
@@ -183,7 +172,8 @@ app.post('/api/pedidos', async (req, res) => {
   } catch (error) {
     console.error('❌ Error creando pedido:', error);
     res.status(500).json({ 
-      error: 'Error al crear el pedido: ' + error.message
+      error: 'Error al crear el pedido: ' + error.message,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
     });
   }
 });
@@ -191,7 +181,13 @@ app.post('/api/pedidos', async (req, res) => {
 // 🔥 RUTAS PROTEGIDAS (CON AUTENTICACIÓN PARA ADMIN)
 app.get('/api/pedidos', auth, async (req, res) => {
   try {
+    console.log('📦 SOLICITUD DE PEDIDOS RECIBIDA');
+    console.log('🔐 Usuario autenticado:', req.user);
+    
     const orders = await Order.find().sort({ createdAt: -1 });
+    
+    console.log(`✅ Pedidos encontrados: ${orders.length}`);
+    
     res.json(orders);
   } catch (error) {
     console.error('Error obteniendo pedidos:', error);
@@ -240,10 +236,29 @@ app.patch('/api/pedidos/:id', auth, async (req, res) => {
 app.get('/api/pedidos/public', async (req, res) => {
   try {
     const orders = await Order.find().sort({ createdAt: -1 }).limit(50);
-    res.json(orders);
+    res.json({
+      message: 'Pedidos públicos',
+      count: orders.length,
+      orders: orders
+    });
   } catch (error) {
     console.error('Error obteniendo pedidos públicos:', error);
     res.status(500).json({ error: 'Error al obtener pedidos' });
+  }
+});
+
+// ✅ RUTA DEBUG PARA TESTING
+app.get('/api/debug', async (req, res) => {
+  try {
+    const orderCount = await Order.countDocuments();
+    res.json({
+      message: 'Debug endpoint',
+      ordersInDB: orderCount,
+      timestamp: new Date().toISOString(),
+      database: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected'
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
   }
 });
 
@@ -271,5 +286,4 @@ app.listen(PORT, '0.0.0.0', () => {
   console.log(`🌐 URL: http://localhost:${PORT}`);
   console.log(`📊 Entorno: ${process.env.NODE_ENV || 'development'}`);
   console.log(`✅ CORS configurado de forma robusta`);
-  console.log(`🔐 JWT Secret: ${process.env.JWT_SECRET ? '✅ Configurado' : '❌ Usando fallback'}`);
 });
