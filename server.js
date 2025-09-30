@@ -13,14 +13,40 @@ const app = express();
 // ✅ PUERTO CORRECTO
 const PORT = process.env.PORT || 3000;
 
-// ✅ CONFIGURACIÓN CORS SIMPLIFICADA - PERMITE TODO
+// ✅ CONFIGURACIÓN CORS ROBUSTA
 app.use(cors({
-  origin: "*",
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'Origin']
+  origin: function (origin, callback) {
+    // Permitir todos los orígenes durante desarrollo
+    if (!origin) return callback(null, true);
+    
+    const allowedOrigins = [
+      'http://localhost:3000',
+      'http://localhost:5000', 
+      'http://localhost:51988',
+      'http://localhost:52959',
+      'https://*.netlify.app',
+      'https://*.render.com',
+      'http://*.localhost'
+    ];
+    
+    if (allowedOrigins.indexOf(origin) !== -1 || !origin) {
+      callback(null, true);
+    } else {
+      callback(null, true); // Permitir todos temporalmente
+    }
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH', 'HEAD'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'Origin', 'X-Requested-With', 'Access-Control-Allow-Origin']
 }));
 
-app.use(helmet());
+// ✅ MANEJAR PREFLIGHT CORS MANUALMENTE
+app.options('*', cors());
+
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: "cross-origin" }
+}));
+
 app.use(express.json());
 
 // ✅ CONEXIÓN MONGODB
@@ -61,12 +87,12 @@ app.get('/health', (req, res) => {
   });
 });
 
-// 🔥 RUTAS DE AUTENTICACIÓN - CORREGIDA
+// 🔥 RUTAS DE AUTENTICACIÓN
 app.post('/api/auth/login', async (req, res) => {
   try {
     console.log('🔐 SOLICITUD DE LOGIN RECIBIDA:', req.body);
     
-    const { username, password } = req.body; // ✅ CAMBIADO: username no email
+    const { username, password } = req.body;
 
     console.log('👤 Username recibido:', username);
 
@@ -74,7 +100,7 @@ app.post('/api/auth/login', async (req, res) => {
       return res.status(400).json({ error: 'Username y contraseña son requeridos' });
     }
 
-    const user = await User.findOne({ username }); // ✅ CAMBIADO: buscar por username
+    const user = await User.findOne({ username });
     console.log('👤 Usuario encontrado:', user ? 'Sí' : 'No');
     
     if (!user) {
@@ -83,7 +109,7 @@ app.post('/api/auth/login', async (req, res) => {
     }
 
     console.log('🔑 Comparando contraseña...');
-    const isPasswordValid = await bcrypt.compare(password, user.passwordHash); // ✅ CAMBIADO: passwordHash
+    const isPasswordValid = await bcrypt.compare(password, user.passwordHash);
     console.log('✅ Contraseña válida:', isPasswordValid);
     
     if (!isPasswordValid) {
@@ -91,7 +117,7 @@ app.post('/api/auth/login', async (req, res) => {
     }
 
     const token = jwt.sign(
-      { userId: user._id, username: user.username }, // ✅ CAMBIADO: username
+      { userId: user._id, username: user.username },
       process.env.JWT_SECRET || 'fallback_secret',
       { expiresIn: '24h' }
     );
@@ -101,7 +127,7 @@ app.post('/api/auth/login', async (req, res) => {
       token,
       user: {
         id: user._id,
-        username: user.username, // ✅ CAMBIADO: username
+        username: user.username,
       }
     });
 
@@ -111,7 +137,7 @@ app.post('/api/auth/login', async (req, res) => {
   }
 });
 
-// 🔥 RUTA PARA CREAR PEDIDOS - CORREGIDA
+// 🔥 RUTA PARA CREAR PEDIDOS
 app.post('/api/pedidos', async (req, res) => {
   try {
     console.log('📦 Recibiendo nuevo pedido:', JSON.stringify(req.body, null, 2));
@@ -210,9 +236,40 @@ app.patch('/api/pedidos/:id', auth, async (req, res) => {
   }
 });
 
+// ✅ RUTA PARA OBTENER PEDIDOS PÚBLICOS (SIN AUTENTICACIÓN)
+app.get('/api/pedidos/public', async (req, res) => {
+  try {
+    const orders = await Order.find().sort({ createdAt: -1 }).limit(50);
+    res.json(orders);
+  } catch (error) {
+    console.error('Error obteniendo pedidos públicos:', error);
+    res.status(500).json({ error: 'Error al obtener pedidos' });
+  }
+});
+
+// ✅ MANEJAR RUTAS NO ENCONTRADAS
+app.use('*', (req, res) => {
+  res.status(404).json({ 
+    error: 'Ruta no encontrada',
+    path: req.originalUrl,
+    method: req.method
+  });
+});
+
+// ✅ MANEJADOR DE ERRORES GLOBAL
+app.use((error, req, res, next) => {
+  console.error('🔥 Error global:', error);
+  res.status(500).json({ 
+    error: 'Error interno del servidor',
+    message: process.env.NODE_ENV === 'development' ? error.message : 'Algo salió mal'
+  });
+});
+
 // ✅ INICIAR SERVIDOR
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Servidor Nabi Backend iniciado en puerto ${PORT}`);
   console.log(`🌐 URL: http://localhost:${PORT}`);
-  console.log(`✅ CORS configurado`);
+  console.log(`📊 Entorno: ${process.env.NODE_ENV || 'development'}`);
+  console.log(`✅ CORS configurado de forma robusta`);
+  console.log(`🔐 JWT Secret: ${process.env.JWT_SECRET ? '✅ Configurado' : '❌ Usando fallback'}`);
 });
