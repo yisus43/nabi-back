@@ -10,22 +10,21 @@ const User = require('./models/user');
 const auth = require('./middleware/auth');
 const app = express();
 
-// ✅ CORS para producción
+// ✅ CORS MEJORADO - Agrega esto
 app.use(cors({
   origin: [
     'http://localhost:3000',
-    'http://localhost:3001',
+    'http://localhost:3001', 
     'http://localhost:5000',
-    'https://nabi-hotcakes.netlify.app'
+    'https://nabi-hotcakes.netlify.app',
+    'http://127.0.0.1:5500',  // Live Server de VS Code
+    'http://localhost:5500',  // Live Server alternativo
+    'file://'                 // Archivos locales
   ],
-  credentials: true
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
 }));
-
-app.use(helmet());
-app.use(express.json());
-
-const PORT = process.env.PORT || 3000;
-
 // ✅ CONEXIÓN MONGODB CON FALLBACK
 console.log('🔗 Intentando conectar a MongoDB...');
 
