@@ -13,23 +13,24 @@ const createAdmin = async () => {
     console.log('✅ Conectado a MongoDB');
 
     // Verificar si ya existe el admin
-    const existingAdmin = await User.findOne({ email: 'admin@nabi.com' });
+    const existingAdmin = await User.findOne({ username: 'admin' });
     if (existingAdmin) {
       console.log('⚠️  El usuario admin ya existe');
+      console.log('📧 Username: admin');
+      console.log('🔑 Password: admin123');
       process.exit();
     }
 
-    // Crear admin
-    const hashedPassword = await bcrypt.hash('admin123', 10);
+    // Crear admin con la estructura CORRECTA
+    const passwordHash = await bcrypt.hash('admin123', 10);
     const admin = new User({
-      name: 'Administrador',
-      email: 'admin@nabi.com',
-      password: hashedPassword
+      username: 'admin',  // ✅ Usar 'username' no 'email'
+      passwordHash: passwordHash,  // ✅ Usar 'passwordHash' no 'password'
     });
     
     await admin.save();
     console.log('✅ Admin creado exitosamente');
-    console.log('📧 Email: admin@nabi.com');
+    console.log('👤 Username: admin');
     console.log('🔑 Password: admin123');
     
   } catch (error) {
