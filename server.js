@@ -5,11 +5,9 @@ const cors = require('cors');
 const helmet = require('helmet');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-
-const Order = require('./models/Order');
-const User = require('./models/User');
+const Order = require('./models/order');
+const User = require('./models/user'); 
 const auth = require('./middleware/auth');
-
 const app = express();
 
 // ✅ CORS para producción
