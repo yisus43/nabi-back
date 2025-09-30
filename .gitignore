@@ -1,12 +1,17 @@
-node_modules/
-.env
+# Flutter/Dart generated files
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.pub-cache/
+build/
+
+# IDE config files
+.idea/
+.vscode/
+*.iml
+
+# OS-specific files
 .DS_Store
-*.log
-.nyc_output
-coverage/
-.npm
-.env.local
-.env.production
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
+Thumbs.db
+
