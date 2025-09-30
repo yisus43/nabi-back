@@ -106,46 +106,59 @@ app.post('/api/auth/login', async (req, res) => {
   }
 });
 
-// 🔥 RUTA PARA CREAR PEDIDOS (SIN AUTENTICACIÓN PARA CLIENTES)
+// 🔥 RUTA PARA CREAR PEDIDOS - CORREGIDA
 app.post('/api/pedidos', async (req, res) => {
   try {
-    console.log('📦 Recibiendo nuevo pedido:', req.body);
+    console.log('📦 Recibiendo nuevo pedido:', JSON.stringify(req.body, null, 2));
 
-    const { customer, quantity, package, liquidos, frutas, extras, total, notes } = req.body;
+    const { customer, quantity, package, liquidos, frutas, toppings, extras, delivery, punto, vestimenta, phone, total } = req.body;
 
     // Validaciones básicas
-    if (!customer || !quantity || !package) {
+    if (!customer || !quantity || !package || !phone) {
       return res.status(400).json({ 
-        error: 'Campos requeridos: customer, quantity, package' 
+        error: 'Campos requeridos: customer, quantity, package, phone',
+        received: req.body
       });
     }
 
-    // Crear nuevo pedido
-    const newOrder = new Order({
-      customer,
+    // CORREGIR: Crear pedido con la estructura correcta
+    const orderData = {
+      customer: customer.toString().trim(),
       quantity: parseInt(quantity),
-      package,
-      liquidos: liquidos || [],
-      frutas: frutas || [],
-      extras: extras || [],
-      total: total || 0,
-      notes: notes || '',
-      status: 'pending',
+      package: package.toString(),
+      liquidos: Array.isArray(liquidos) ? liquidos : [],
+      frutas: Array.isArray(frutas) ? frutas : [],
+      toppings: Array.isArray(toppings) ? toppings : [],
+      extras: extras ? extras.toString() : '', // ✅ Convertir a string, no array
+      delivery: delivery ? delivery.toString() : 'recoger',
+      punto: punto ? punto.toString() : '',
+      vestimenta: vestimenta ? vestimenta.toString() : '',
+      phone: phone.toString().trim(),
+      total: parseFloat(total) || 0,
+      status: 'pendiente', // ✅ Cambiar de 'pending' a 'pendiente'
       date: new Date()
-    });
+    };
 
+    console.log('💾 Datos del pedido a guardar:', orderData);
+
+    const newOrder = new Order(orderData);
     const savedOrder = await newOrder.save();
-    console.log('✅ Pedido guardado:', savedOrder._id);
+    
+    console.log('✅ Pedido guardado ID:', savedOrder._id);
 
     res.status(201).json({
       message: 'Pedido creado exitosamente',
+      orderId: savedOrder._id,
       order: savedOrder
     });
 
   } catch (error) {
     console.error('❌ Error creando pedido:', error);
+    console.error('📝 Stack trace:', error.stack);
     res.status(500).json({ 
-      error: 'Error al crear el pedido: ' + error.message 
+      error: 'Error al crear el pedido',
+      message: error.message,
+      details: process.env.NODE_ENV === 'development' ? error.stack : undefined
     });
   }
 });
