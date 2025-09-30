@@ -61,27 +61,27 @@ app.get('/health', (req, res) => {
   });
 });
 
-// 🔥 RUTAS DE AUTENTICACIÓN
+// 🔥 RUTAS DE AUTENTICACIÓN - CORREGIDA
 app.post('/api/auth/login', async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const { username, password } = req.body; // ✅ CAMBIADO: username en lugar de email
 
-    if (!email || !password) {
-      return res.status(400).json({ error: 'Email y contraseña son requeridos' });
+    if (!username || !password) {
+      return res.status(400).json({ error: 'Username y contraseña son requeridos' });
     }
 
-    const user = await User.findOne({ email });
+    const user = await User.findOne({ username }); // ✅ CAMBIADO: buscar por username
     if (!user) {
       return res.status(401).json({ error: 'Credenciales inválidas' });
     }
 
-    const isPasswordValid = await bcrypt.compare(password, user.password);
+    const isPasswordValid = await bcrypt.compare(password, user.passwordHash); // ✅ CAMBIADO: passwordHash
     if (!isPasswordValid) {
       return res.status(401).json({ error: 'Credenciales inválidas' });
     }
 
     const token = jwt.sign(
-      { userId: user._id, email: user.email }, 
+      { userId: user._id, username: user.username }, // ✅ CAMBIADO: username en lugar de email
       process.env.JWT_SECRET || 'fallback_secret',
       { expiresIn: '24h' }
     );
@@ -91,8 +91,7 @@ app.post('/api/auth/login', async (req, res) => {
       token,
       user: {
         id: user._id,
-        email: user.email,
-        name: user.name
+        username: user.username, // ✅ CAMBIADO: username en lugar de email
       }
     });
 
