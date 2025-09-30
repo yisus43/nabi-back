@@ -13,20 +13,11 @@ const app = express();
 // ✅ PUERTO CORRECTO
 const PORT = process.env.PORT || 3000;
 
-// ✅ CONFIGURACIÓN CORS MEJORADA
+// ✅ CONFIGURACIÓN CORS SIMPLIFICADA - PERMITE TODO
 app.use(cors({
-  origin: [
-    'https://phenomenal-tiramisu-0fa451.netlify.app',  // ✅ TU URL CORRECTA
-    'https://gentle-douhua-3750b2.netlify.app',
-    'http://localhost:3000',
-    'http://localhost:3001',
-    'http://127.0.0.1:5500',
-    'http://localhost:5500',
-    'https://nabi-hotcakes.netlify.app'
-  ],
-  credentials: true,
+  origin: "*",  // ✅ PERMITE CUALQUIER DOMINIO
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'Accept']
+  allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'Origin']
 }));
 
 app.use(helmet());
