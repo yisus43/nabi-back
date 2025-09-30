@@ -9,14 +9,14 @@
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11.10.7/dist/sweetalert2.min.css">
   <style>
     :root {
-      --primary: #8e44ad;
+      --primary: #7d3c98; /* MORADO MÁS FUERTE */
       --secondary: #9b59b6;
       --accent: #f8f4ff;
       --text-dark: #2c3e50;
       --text-light: #fff;
       --success: #27ae60;
       --warning: #f39c12;
-      --shadow: 0 4px 20px rgba(142, 68, 173, 0.15);
+      --shadow: 0 4px 20px rgba(125, 60, 152, 0.2); /* Shadow más morado */
       --radius: 12px;
     }
 
@@ -66,6 +66,7 @@
       font-size: 1.8rem;
     }
 
+    /* 🆕 NUEVO LOGO MINIMALISTA */
     .logo-icon {
       width: 50px;
       height: 50px;
@@ -74,8 +75,28 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      color: var(--primary);
-      font-size: 1.5rem;
+      background: linear-gradient(135deg, #fff, #f8f4ff);
+      box-shadow: 0 4px 10px rgba(125, 60, 152, 0.3);
+      border: 2px solid rgba(255, 255, 255, 0.8);
+    }
+
+    .logo-symbol {
+      font-size: 1.8rem;
+      background: linear-gradient(135deg, var(--primary), var(--secondary));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      filter: drop-shadow(0 2px 4px rgba(125, 60, 152, 0.3));
+    }
+
+    .logo-text {
+      font-family: 'Pacifico', cursive;
+      font-size: 2rem;
+      background: linear-gradient(135deg, #ffffff, #f8f4ff);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
     }
 
     .nav-links {
@@ -136,7 +157,7 @@
 
     .cta-button:hover {
       transform: translateY(-3px);
-      box-shadow: 0 6px 25px rgba(142, 68, 173, 0.3);
+      box-shadow: 0 6px 25px rgba(125, 60, 152, 0.4);
     }
 
     /* Menu Section */
@@ -153,35 +174,54 @@
       margin-bottom: 3rem;
     }
 
-    .menu-grid {
+    .package-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
       gap: 2rem;
       margin-bottom: 3rem;
     }
 
-    .menu-card {
+    .package-card {
       background: var(--accent);
       padding: 2rem;
       border-radius: var(--radius);
       text-align: center;
       transition: all 0.3s ease;
       border: 2px solid transparent;
+      cursor: pointer;
+      position: relative;
+      overflow: hidden;
     }
 
-    .menu-card:hover {
+    .package-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 4px;
+      background: linear-gradient(135deg, var(--primary), var(--secondary));
+    }
+
+    .package-card:hover {
       transform: translateY(-5px);
       border-color: var(--primary);
       box-shadow: var(--shadow);
     }
 
-    .menu-card i {
+    .package-card.selected {
+      border-color: var(--primary);
+      background: linear-gradient(135deg, #f8f4ff, #e8f4ff);
+      box-shadow: 0 8px 25px rgba(125, 60, 152, 0.2);
+    }
+
+    .package-card i {
       font-size: 3rem;
       color: var(--primary);
       margin-bottom: 1rem;
     }
 
-    .menu-card h3 {
+    .package-card h3 {
       color: var(--primary);
       margin-bottom: 1rem;
       font-size: 1.5rem;
@@ -192,6 +232,23 @@
       font-weight: 700;
       color: var(--secondary);
       margin: 1rem 0;
+    }
+
+    .select-package-btn {
+      background: linear-gradient(135deg, var(--primary), var(--secondary));
+      color: white;
+      border: none;
+      padding: 0.8rem 1.5rem;
+      border-radius: var(--radius);
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      margin-top: 1rem;
+    }
+
+    .select-package-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 15px rgba(125, 60, 152, 0.3);
     }
 
     /* Order Section */
@@ -234,7 +291,52 @@
     .form-group select:focus {
       outline: none;
       border-color: var(--primary);
-      box-shadow: 0 0 0 3px rgba(142, 68, 173, 0.1);
+      box-shadow: 0 0 0 3px rgba(125, 60, 152, 0.1);
+    }
+
+    .ingredients-section {
+      background: var(--accent);
+      padding: 2rem;
+      border-radius: var(--radius);
+      margin: 2rem 0;
+      border: 2px dashed var(--primary);
+    }
+
+    .ingredients-section h3 {
+      color: var(--primary);
+      margin-bottom: 1rem;
+      text-align: center;
+      font-size: 1.4rem;
+    }
+
+    .ingredients-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 1rem;
+      margin-top: 1rem;
+    }
+
+    .ingredient-category {
+      background: white;
+      padding: 1rem;
+      border-radius: var(--radius);
+      border: 2px solid transparent;
+    }
+
+    .ingredient-category h4 {
+      color: var(--primary);
+      margin-bottom: 0.5rem;
+      font-size: 1rem;
+    }
+
+    .ingredient-list {
+      list-style: none;
+    }
+
+    .ingredient-list li {
+      padding: 0.3rem 0;
+      color: var(--text-dark);
+      font-size: 0.9rem;
     }
 
     .price-display {
@@ -273,7 +375,7 @@
 
     .submit-btn:hover {
       transform: translateY(-2px);
-      box-shadow: 0 6px 25px rgba(142, 68, 173, 0.3);
+      box-shadow: 0 6px 25px rgba(125, 60, 152, 0.3);
     }
 
     .submit-btn:disabled {
@@ -347,6 +449,10 @@
       .section-title {
         font-size: 2.2rem;
       }
+
+      .package-grid {
+        grid-template-columns: 1fr;
+      }
     }
 
     /* Animations */
@@ -393,6 +499,12 @@
     .hidden {
       display: none !important;
     }
+
+    .highlight {
+      background: linear-gradient(135deg, var(--primary), var(--secondary)) !important;
+      color: white !important;
+      font-weight: bold !important;
+    }
   </style>
 </head>
 <body>
@@ -401,9 +513,10 @@
     <div class="container nav-container">
       <a href="#" class="logo">
         <div class="logo-icon">
-          <i class="fas fa-pancakes"></i>
+          <!-- 🆕 NUEVO LOGO MINIMALISTA -->
+          <div class="logo-symbol">🥞</div>
         </div>
-        Nabi Hot Cakes
+        <span class="logo-text">NABI</span>
       </a>
       <nav class="nav-links">
         <a href="#menu">Menú</a>
@@ -427,55 +540,61 @@
   <!-- Menu Section -->
   <section id="menu" class="menu-section">
     <div class="container">
-      <h2 class="section-title">Nuestro Menú</h2>
-      <div class="menu-grid">
-        <div class="menu-card fade-in">
-          <i class="fas fa-egg"></i>
-          <h3>15 Mini Hot Cakes</h3>
-          <p>Perfecto para un desayuno individual</p>
+      <h2 class="section-title">Nuestros Paquetes</h2>
+      <div class="package-grid">
+        <div class="package-card fade-in" data-package="Chocolate" data-quantity="15" data-price="20">
+          <i class="fas fa-cookie-bite"></i>
+          <h3>Paquete Chocolate</h3>
+          <p>15 Mini Hot Cakes con chocolate</p>
           <div class="price">$20 MXN</div>
-          <p>+ $5 por líquido, fruta o topping</p>
+          <button class="select-package-btn">Seleccionar</button>
         </div>
-        <div class="menu-card fade-in">
-          <i class="fas fa-egg"></i>
-          <h3>20 Mini Hot Cakes</h3>
-          <p>Ideal para compartir</p>
+        <div class="package-card fade-in" data-package="Lechera" data-quantity="20" data-price="25">
+          <i class="fas fa-ice-cream"></i>
+          <h3>Paquete Lechera</h3>
+          <p>20 Mini Hot Cakes con lechera</p>
           <div class="price">$25 MXN</div>
-          <p>+ $5 por líquido, fruta o topping</p>
+          <button class="select-package-btn">Seleccionar</button>
         </div>
-        <div class="menu-card fade-in">
-          <i class="fas fa-egg"></i>
-          <h3>25 Mini Hot Cakes</h3>
-          <p>Para los más hambrientos</p>
+        <div class="package-card fade-in" data-package="Fresita" data-quantity="25" data-price="30">
+          <i class="fas fa-stroopwafel"></i>
+          <h3>Paquete Fresita</h3>
+          <p>25 Mini Hot Cakes con fresa</p>
           <div class="price">$30 MXN</div>
-          <p>+ $5 por líquido, fruta o topping</p>
+          <button class="select-package-btn">Seleccionar</button>
+        </div>
+        <div class="package-card fade-in" data-package="Fitness" data-quantity="20" data-price="25">
+          <i class="fas fa-apple-alt"></i>
+          <h3>Paquete Fitness</h3>
+          <p>20 Mini Hot Cakes saludables</p>
+          <div class="price">$25 MXN</div>
+          <button class="select-package-btn">Seleccionar</button>
         </div>
       </div>
 
-      <div class="menu-card fade-in" style="max-width: 800px; margin: 0 auto;">
-        <i class="fas fa-star"></i>
-        <h3>Ingredientes Disponibles</h3>
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; text-align: left;">
-          <div>
-            <h4>Líquidos</h4>
-            <ul>
+      <div class="ingredients-section fade-in">
+        <h3>🍓 Ingredientes Disponibles</h3>
+        <div class="ingredients-grid">
+          <div class="ingredient-category">
+            <h4>🥛 Líquidos</h4>
+            <ul class="ingredient-list">
               <li>Lechera</li>
               <li>Nutella</li>
               <li>Miel</li>
               <li>Mermelada</li>
             </ul>
           </div>
-          <div>
-            <h4>Frutas</h4>
-            <ul>
+          <div class="ingredient-category">
+            <h4>🍓 Frutas</h4>
+            <ul class="ingredient-list">
               <li>Uva</li>
               <li>Plátano</li>
               <li>Manzana</li>
             </ul>
           </div>
-          <div>
-            <h4>Toppings</h4>
-            <ul>
+          <div class="ingredient-category">
+            <h4>🍫 Toppings</h4>
+            <ul class="ingredient-list">
               <li>Oreo</li>
               <li>Príncipe</li>
               <li>Mazapán</li>
@@ -491,7 +610,7 @@
   <!-- Order Section -->
   <section id="pedido" class="order-section">
     <div class="container">
-      <h2 class="section-title">Haz Tu Pedido</h2>
+      <h2 class="section-title">Personaliza Tu Pedido</h2>
       <div class="order-container fade-in">
         <form id="orderForm">
           <div class="form-group">
@@ -500,7 +619,7 @@
           </div>
 
           <div class="form-group">
-            <label for="quantity"><i class="fas fa-sort-amount-up"></i> Cantidad</label>
+            <label for="quantity"><i class="fas fa-sort-amount-up"></i> Cantidad de Hot Cakes</label>
             <select id="quantity" required>
               <option value="">Selecciona cantidad</option>
               <option value="15">15 Mini Hot Cakes - $20</option>
@@ -517,7 +636,7 @@
               <option value="Chocolate">Chocolate</option>
               <option value="Lechera">Lechera</option>
               <option value="Fresita">Fresita</option>
-              <option value="personalizado">Personalizado (elige tus ingredientes)</option>
+              <option value="personalizado" class="highlight">✨ Personalizar Ingredientes</option>
             </select>
           </div>
 
@@ -577,6 +696,7 @@
               <option value="Entrada EMA 8">Entrada EMA 8</option>
               <option value="Entrada EMA 9">Entrada EMA 9</option>
               <option value="Entrada EMA 10">Entrada EMA 10</option>
+              <option value="Lobo">Lobo</option>
               <option value="Oxxo">Oxxo</option>
               <option value="Cafetería">Cafetería</option>
             </select>
@@ -655,11 +775,48 @@
     const priceDisplay = document.getElementById('priceCalc');
     const priceDetails = document.getElementById('priceDetails');
     const submitBtn = document.getElementById('submitBtn');
+    const packageCards = document.querySelectorAll('.package-card');
+
+    // 🆕 SELECCIÓN DE PAQUETES DESDE LAS TARJETAS
+    packageCards.forEach(card => {
+      card.addEventListener('click', function() {
+        // Remover selección anterior
+        packageCards.forEach(c => c.classList.remove('selected'));
+        
+        // Agregar selección actual
+        this.classList.add('selected');
+        
+        // Llenar el formulario automáticamente
+        const package = this.dataset.package;
+        const quantity = this.dataset.quantity;
+        const price = this.dataset.price;
+        
+        document.getElementById('package').value = package;
+        document.getElementById('quantity').value = quantity;
+        
+        // Calcular precio
+        calcularPrecio();
+        
+        // 🆕 DESPLAZARSE A LA SECCIÓN DE PEDIDOS
+        document.getElementById('pedido').scrollIntoView({ 
+          behavior: 'smooth' 
+        });
+        
+        // Si es un paquete predefinido, ocultar personalización
+        if (package !== 'personalizado') {
+          customCombo.classList.add('hidden');
+        } else {
+          customCombo.classList.remove('hidden');
+        }
+      });
+    });
 
     // Mostrar/ocultar personalización
     packageSelect.addEventListener('change', function() {
       if (this.value === 'personalizado') {
         customCombo.classList.remove('hidden');
+        // Remover selección de tarjetas
+        packageCards.forEach(card => card.classList.remove('selected'));
       } else {
         customCombo.classList.add('hidden');
       }
@@ -791,7 +948,7 @@
           icon: 'warning',
           title: '¡Faltan datos!',
           text: 'Por favor completa todos los campos requeridos.',
-          confirmButtonColor: '#8e44ad'
+          confirmButtonColor: '#7d3c98'
         });
         return;
       }
@@ -803,7 +960,7 @@
           icon: 'warning',
           title: '¡Selecciona un punto!',
           text: 'Por favor elige un punto de entrega.',
-          confirmButtonColor: '#8e44ad'
+          confirmButtonColor: '#7d3c98'
         });
         return;
       }
@@ -893,6 +1050,7 @@
           customCombo.classList.add('hidden');
           puntoEntrega.classList.add('hidden');
           deliveryOptions.forEach(opt => opt.classList.remove('selected'));
+          packageCards.forEach(card => card.classList.remove('selected'));
           document.getElementById('delivery').value = '';
           priceDisplay.textContent = '$0 MXN';
           priceDetails.textContent = 'El precio se calculará automáticamente';
