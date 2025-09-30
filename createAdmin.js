@@ -1,54 +1,43 @@
 require('dotenv').config();
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
-const User = require('./models/User');
+const User = require('./models/user');
 
-async function createAdmin() {
+const createAdmin = async () => {
   try {
     console.log('🔗 Conectando a MongoDB...');
-    console.log('MONGO_URI:', process.env.MONGO_URI ? '✅ Definida' : '❌ No definida');
     
-    if (!process.env.MONGO_URI) {
-      throw new Error('MONGO_URI no está definida en el archivo .env');
-    }
-
-    await mongoose.connect(process.env.MONGO_URI, {
-      useNewUrlParser: true,
-      useUnifiedTopology: true
-    });
+    const mongoURI = process.env.MONGO_URI || 'mongodb+srv://nabi:naruto214356@cluster0.tcwy4hm.mongodb.net/PedidosDB?retryWrites=true&w=majority&appName=Cluster0';
     
+    await mongoose.connect(mongoURI);
     console.log('✅ Conectado a MongoDB');
 
-    // Verificar si ya existe un admin
-    const existingAdmin = await User.findOne({ username: process.env.ADMIN_USER });
+    // Verificar si ya existe el admin
+    const existingAdmin = await User.findOne({ email: 'admin@nabi.com' });
     if (existingAdmin) {
       console.log('⚠️  El usuario admin ya existe');
-      process.exit(0);
+      process.exit();
     }
 
-    // Crear nuevo admin
-    const password = process.env.ADMIN_PASS || 'admin123';
-    const passwordHash = await bcrypt.hash(password, 12);
-
-    const adminUser = new User({
-      username: process.env.ADMIN_USER,
-      passwordHash: passwordHash
+    // Crear admin
+    const hashedPassword = await bcrypt.hash('admin123', 10);
+    const admin = new User({
+      name: 'Administrador',
+      email: 'admin@nabi.com',
+      password: hashedPassword
     });
-
-    await adminUser.save();
-    console.log('✅ Usuario admin creado exitosamente');
-    console.log(`👤 Usuario: ${process.env.ADMIN_USER}`);
-    console.log(`🔑 Contraseña: ${password}`);
-    console.log('⚠️  ¡Cambia esta contraseña en producción!');
-
+    
+    await admin.save();
+    console.log('✅ Admin creado exitosamente');
+    console.log('📧 Email: admin@nabi.com');
+    console.log('🔑 Password: admin123');
+    
   } catch (error) {
-    console.error('❌ Error creando admin:', error.message);
+    console.error('❌ Error creando admin:', error);
   } finally {
-    if (mongoose.connection.readyState === 1) {
-      await mongoose.connection.close();
-    }
-    process.exit(0);
+    await mongoose.connection.close();
+    process.exit();
   }
-}
+};
 
 createAdmin();
