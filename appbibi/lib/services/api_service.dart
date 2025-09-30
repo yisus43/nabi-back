@@ -15,20 +15,45 @@ class ApiService {
 
   Future<Map<String, dynamic>> login(String username, String password) async {
     try {
-      final response = await http.post(
-        Uri.parse('$baseUrl/auth/login'),
-        headers: {'Content-Type': 'application/json'},
-        body: json.encode({
-          'username': username,
-          'password': password,
-        }),
-      );
+      // ✅ INTENTAR MÚLTIPLES ESTRATEGIAS
+      final urls = [
+        '$baseUrl/auth/login', // Directo
+        'https://corsproxy.io/?' + Uri.encodeComponent('$baseUrl/auth/login'), // Proxy 1
+        'https://api.corsproxy.io/?' + Uri.encodeComponent('$baseUrl/auth/login'), // Proxy 2
+      ];
+
+      http.Response? response;
+      String usedUrl = '';
+
+      for (final url in urls) {
+        try {
+          print('🔄 Intentando con: $url');
+          usedUrl = url;
+          response = await http.post(
+            Uri.parse(url),
+            headers: {'Content-Type': 'application/json'},
+            body: json.encode({
+              'username': username,
+              'password': password,
+            }),
+          ).timeout(const Duration(seconds: 10));
+          
+          if (response.statusCode == 200) break;
+        } catch (e) {
+          print('❌ Falló URL: $url - $e');
+          continue;
+        }
+      }
+
+      if (response == null) {
+        throw Exception('Todas las URLs fallaron');
+      }
 
       if (response.statusCode == 200) {
         return json.decode(response.body);
       } else {
-        final errorData = json.decode(response.body);
-        throw Exception(errorData['error'] ?? 'Error en login: ${response.statusCode}');
+        final errorBody = response.body.isNotEmpty ? json.decode(response.body) : {};
+        throw Exception(errorBody['error'] ?? 'Error en login: ${response.statusCode}');
       }
     } catch (e) {
       throw Exception('Error de conexión: $e');
