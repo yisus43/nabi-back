@@ -11,7 +11,7 @@ class LoginScreen extends StatefulWidget {
 
 class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _emailController = TextEditingController();
+  final _usernameController = TextEditingController(); // ✅ CAMBIADO
   final _passwordController = TextEditingController();
   final _apiService = ApiService();
   bool _isLoading = false;
@@ -24,13 +24,13 @@ class _LoginScreenState extends State<LoginScreen> {
 
       try {
         final response = await _apiService.login(
-          _emailController.text.trim(),
+          _usernameController.text.trim(), // ✅ CAMBIADO
           _passwordController.text,
         );
 
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString('token', response['token']);
-        await prefs.setString('userEmail', response['user']['email']);
+        await prefs.setString('userEmail', response['user']['username']); // ✅ CAMBIADO
 
         if (mounted) {
           Navigator.pushReplacementNamed(context, '/dashboard');
@@ -97,20 +97,17 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                     const SizedBox(height: 32),
                     TextFormField(
-                      controller: _emailController,
+                      controller: _usernameController, // ✅ CAMBIADO
                       decoration: InputDecoration(
-                        labelText: 'Email',
-                        prefixIcon: Icon(Icons.email, color: Colors.purple),
+                        labelText: 'Username', // ✅ CAMBIADO
+                        prefixIcon: Icon(Icons.person, color: Colors.purple), // ✅ CAMBIADO
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(8),
                         ),
                       ),
                       validator: (value) {
                         if (value == null || value.isEmpty) {
-                          return 'Por favor ingresa tu email';
-                        }
-                        if (!value.contains('@')) {
-                          return 'Ingresa un email válido';
+                          return 'Por favor ingresa tu username'; // ✅ CAMBIADO
                         }
                         return null;
                       },
@@ -163,7 +160,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   void dispose() {
-    _emailController.dispose();
+    _usernameController.dispose(); // ✅ CAMBIADO
     _passwordController.dispose();
     super.dispose();
   }
