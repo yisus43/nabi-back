@@ -121,14 +121,29 @@ app.post('/api/auth/login', async (req, res) => {
   }
 });
 
-// 🔥 RUTA PARA CREAR PEDIDOS - MEJORADA
+// 🔥 RUTA PARA CREAR PEDIDOS - CORREGIDA CON NUEVO SCHEMA
 app.post('/api/pedidos', async (req, res) => {
   try {
     console.log('📦 Recibiendo nuevo pedido...');
     console.log('📊 Headers:', req.headers);
     console.log('📝 Body:', req.body);
 
-    const { customer, quantity, package, liquidos, frutas, toppings, extras, delivery, punto, vestimenta, phone, total } = req.body;
+    const { 
+      customer, 
+      quantity, 
+      package, 
+      liquidos, 
+      frutas, 
+      toppings, 
+      extras, 
+      delivery, 
+      punto, 
+      phone, 
+      total, 
+      notas, 
+      dia, 
+      hora 
+    } = req.body;
 
     // Validaciones mejoradas
     if (!customer || !quantity || !package || !phone) {
@@ -146,10 +161,12 @@ app.post('/api/pedidos', async (req, res) => {
       liquidos: Array.isArray(liquidos) ? liquidos : [],
       frutas: Array.isArray(frutas) ? frutas : [],
       toppings: Array.isArray(toppings) ? toppings : [],
-      extras: extras ? extras.toString() : '',
+      extras: Array.isArray(extras) ? extras : [], // ✅ Ahora como array
+      notas: notas || '', // ✅ Nuevo campo
       delivery: delivery ? delivery.toString() : 'recoger',
       punto: punto ? punto.toString() : '',
-      vestimenta: vestimenta ? vestimenta.toString() : '',
+      dia: dia || '', // ✅ Nuevo campo
+      hora: hora || '', // ✅ Nuevo campo
       phone: phone.toString().trim(),
       total: parseFloat(total) || 0,
       status: 'Pendiente',
