@@ -249,6 +249,78 @@ app.patch('/api/pedidos/:id', auth, async (req, res) => {
   }
 });
 
+// 🆕 RUTAS PARA LIMPIAR PEDIDOS (CON AUTENTICACIÓN)
+app.delete('/api/pedidos/status/:status', auth, async (req, res) => {
+  try {
+    const { status } = req.params;
+    
+    console.log(`🗑️ SOLICITUD PARA ELIMINAR PEDIDOS CON ESTADO: ${status}`);
+    console.log('🔐 Usuario autenticado:', req.user);
+
+    const allowedStatus = ['Entregado', 'Cancelado'];
+    if (!allowedStatus.includes(status)) {
+      return res.status(400).json({ 
+        error: 'Estado inválido. Solo se pueden eliminar pedidos Entregado o Cancelado' 
+      });
+    }
+
+    const result = await Order.deleteMany({ status: status });
+    
+    console.log(`✅ Pedidos ${status} eliminados: ${result.deletedCount}`);
+    
+    res.json({
+      message: `Pedidos ${status} eliminados exitosamente`,
+      deletedCount: result.deletedCount
+    });
+
+  } catch (error) {
+    console.error('❌ Error eliminando pedidos por estado:', error);
+    res.status(500).json({ error: 'Error al eliminar pedidos: ' + error.message });
+  }
+});
+
+app.delete('/api/pedidos/completed', auth, async (req, res) => {
+  try {
+    console.log('🗑️ SOLICITUD PARA ELIMINAR PEDIDOS COMPLETADOS');
+    console.log('🔐 Usuario autenticado:', req.user);
+
+    const result = await Order.deleteMany({ 
+      status: { $in: ['Entregado', 'Cancelado'] } 
+    });
+    
+    console.log(`✅ Pedidos completados eliminados: ${result.deletedCount}`);
+    
+    res.json({
+      message: 'Pedidos completados eliminados exitosamente',
+      deletedCount: result.deletedCount
+    });
+
+  } catch (error) {
+    console.error('❌ Error eliminando pedidos completados:', error);
+    res.status(500).json({ error: 'Error al eliminar pedidos completados: ' + error.message });
+  }
+});
+
+app.delete('/api/pedidos/all', auth, async (req, res) => {
+  try {
+    console.log('🗑️ SOLICITUD PARA ELIMINAR TODOS LOS PEDIDOS');
+    console.log('🔐 Usuario autenticado:', req.user);
+
+    const result = await Order.deleteMany({});
+    
+    console.log(`✅ Todos los pedidos eliminados: ${result.deletedCount}`);
+    
+    res.json({
+      message: 'Todos los pedidos eliminados exitosamente',
+      deletedCount: result.deletedCount
+    });
+
+  } catch (error) {
+    console.error('❌ Error eliminando todos los pedidos:', error);
+    res.status(500).json({ error: 'Error al eliminar todos los pedidos: ' + error.message });
+  }
+});
+
 // ✅ RUTA PARA OBTENER PEDIDOS PÚBLICOS (SIN AUTENTICACIÓN)
 app.get('/api/pedidos/public', async (req, res) => {
   try {
