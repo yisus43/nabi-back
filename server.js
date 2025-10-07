@@ -7,6 +7,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const Order = require('./models/order');
 const User = require('./models/user'); 
+const Ingredient = require('./models/Ingredient'); // 🆕 NUEVO
 const auth = require('./middleware/auth');
 const app = express();
 
@@ -364,6 +365,162 @@ app.delete('/api/pedidos/all', auth, async (req, res) => {
   }
 });
 
+// 🆕 RUTAS PARA INGREDIENTES
+app.get('/api/ingredients', async (req, res) => {
+  try {
+    console.log('🥗 Obteniendo ingredientes...');
+    const ingredients = await Ingredient.find().sort({ category: 1, order: 1, name: 1 });
+    
+    console.log(`✅ Ingredientes encontrados: ${ingredients.length}`);
+    res.json(ingredients);
+  } catch (error) {
+    console.error('❌ Error obteniendo ingredientes:', error);
+    res.status(500).json({ error: 'Error al obtener ingredientes: ' + error.message });
+  }
+});
+
+app.get('/api/ingredients/public', async (req, res) => {
+  try {
+    const ingredients = await Ingredient.find({ available: true })
+      .sort({ category: 1, order: 1, name: 1 });
+    
+    res.json({
+      message: 'Ingredientes públicos',
+      count: ingredients.length,
+      ingredients: ingredients
+    });
+  } catch (error) {
+    console.error('Error obteniendo ingredientes públicos:', error);
+    res.status(500).json({ error: 'Error al obtener ingredientes' });
+  }
+});
+
+app.post('/api/ingredients', auth, async (req, res) => {
+  try {
+    console.log('➕ Creando nuevo ingrediente...');
+    const { name, category, price, available, hasExtraCost, order } = req.body;
+    
+    if (!name || !category) {
+      return res.status(400).json({ error: 'Nombre y categoría son requeridos' });
+    }
+
+    const newIngredient = new Ingredient({
+      name: name.trim(),
+      category,
+      price: price || 0,
+      available: available !== undefined ? available : true,
+      hasExtraCost: hasExtraCost || false,
+      order: order || 0
+    });
+    
+    const savedIngredient = await newIngredient.save();
+    console.log('✅ Ingrediente creado:', savedIngredient.name);
+    
+    res.status(201).json(savedIngredient);
+  } catch (error) {
+    console.error('❌ Error creando ingrediente:', error);
+    res.status(500).json({ error: 'Error al crear ingrediente: ' + error.message });
+  }
+});
+
+app.put('/api/ingredients/:id', auth, async (req, res) => {
+  try {
+    console.log('✏️ Actualizando ingrediente...');
+    const { id } = req.params;
+    const updateData = req.body;
+    
+    const updatedIngredient = await Ingredient.findByIdAndUpdate(
+      id, 
+      { ...updateData, updatedAt: new Date() }, 
+      { new: true, runValidators: true }
+    );
+    
+    if (!updatedIngredient) {
+      return res.status(404).json({ error: 'Ingrediente no encontrado' });
+    }
+    
+    console.log('✅ Ingrediente actualizado:', updatedIngredient.name);
+    res.json(updatedIngredient);
+  } catch (error) {
+    console.error('❌ Error actualizando ingrediente:', error);
+    res.status(500).json({ error: 'Error al actualizar ingrediente: ' + error.message });
+  }
+});
+
+app.delete('/api/ingredients/:id', auth, async (req, res) => {
+  try {
+    console.log('🗑️ Eliminando ingrediente...');
+    const { id } = req.params;
+    
+    const deletedIngredient = await Ingredient.findByIdAndDelete(id);
+    
+    if (!deletedIngredient) {
+      return res.status(404).json({ error: 'Ingrediente no encontrado' });
+    }
+    
+    console.log('✅ Ingrediente eliminado:', deletedIngredient.name);
+    res.json({ 
+      message: 'Ingrediente eliminado exitosamente',
+      deletedIngredient: deletedIngredient.name
+    });
+  } catch (error) {
+    console.error('❌ Error eliminando ingrediente:', error);
+    res.status(500).json({ error: 'Error al eliminar ingrediente: ' + error.message });
+  }
+});
+
+// 🆕 RUTA PARA INICIALIZAR INGREDIENTES POR DEFECTO
+app.post('/api/ingredients/initialize', auth, async (req, res) => {
+  try {
+    console.log('🔄 Inicializando ingredientes por defecto...');
+    
+    const defaultIngredients = [
+      // Líquidos
+      { name: 'Lechera', category: 'liquidos', price: 0, hasExtraCost: false, order: 1 },
+      { name: 'Nutella', category: 'liquidos', price: 5, hasExtraCost: true, order: 2 },
+      { name: 'Maple', category: 'liquidos', price: 0, hasExtraCost: false, order: 3 },
+      { name: 'Mermelada', category: 'liquidos', price: 0, hasExtraCost: false, order: 4 },
+      { name: 'Chocolate Hersheys', category: 'liquidos', price: 5, hasExtraCost: true, order: 5 },
+      
+      // Frutas
+      { name: 'Plátano', category: 'frutas', price: 0, hasExtraCost: false, order: 1 },
+      { name: 'Manzana', category: 'frutas', price: 0, hasExtraCost: false, order: 2 },
+      { name: 'Fresa', category: 'frutas', price: 5, hasExtraCost: true, order: 3 },
+      { name: 'Durazno', category: 'frutas', price: 0, hasExtraCost: false, order: 4 },
+      
+      // Toppings
+      { name: 'Granola', category: 'toppings', price: 0, hasExtraCost: false, order: 1 },
+      { name: 'Nuez', category: 'toppings', price: 0, hasExtraCost: false, order: 2 },
+      { name: 'Zucaritas', category: 'toppings', price: 0, hasExtraCost: false, order: 3 },
+      { name: 'Chispas chocolate', category: 'toppings', price: 0, hasExtraCost: false, order: 4 },
+      { name: 'Chispas colores', category: 'toppings', price: 0, hasExtraCost: false, order: 5 },
+      
+      // Extras
+      { name: 'Bombones', category: 'extras', price: 5, hasExtraCost: true, order: 1 },
+      { name: 'Oreo', category: 'extras', price: 5, hasExtraCost: true, order: 2 },
+      { name: 'Mazapán', category: 'extras', price: 5, hasExtraCost: true, order: 3 },
+      { name: 'Helado', category: 'extras', price: 5, hasExtraCost: true, order: 4 }
+    ];
+
+    // Eliminar ingredientes existentes
+    await Ingredient.deleteMany({});
+    
+    // Insertar nuevos ingredientes
+    const ingredients = await Ingredient.insertMany(defaultIngredients);
+    
+    console.log(`✅ ${ingredients.length} ingredientes inicializados`);
+    
+    res.json({
+      message: 'Ingredientes inicializados exitosamente',
+      count: ingredients.length,
+      ingredients: ingredients
+    });
+  } catch (error) {
+    console.error('❌ Error inicializando ingredientes:', error);
+    res.status(500).json({ error: 'Error al inicializar ingredientes: ' + error.message });
+  }
+});
+
 // ✅ RUTA PARA OBTENER PEDIDOS PÚBLICOS (SIN AUTENTICACIÓN)
 app.get('/api/pedidos/public', async (req, res) => {
   try {
@@ -383,9 +540,11 @@ app.get('/api/pedidos/public', async (req, res) => {
 app.get('/api/debug', async (req, res) => {
   try {
     const orderCount = await Order.countDocuments();
+    const ingredientCount = await Ingredient.countDocuments();
     res.json({
       message: 'Debug endpoint',
       ordersInDB: orderCount,
+      ingredientsInDB: ingredientCount,
       timestamp: new Date().toISOString(),
       database: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected'
     });
