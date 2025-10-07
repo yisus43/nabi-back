@@ -121,12 +121,12 @@ app.post('/api/auth/login', async (req, res) => {
   }
 });
 
-// 🔥 RUTA PARA CREAR PEDIDOS - CORREGIDA CON NUEVO SCHEMA
+// 🔥 RUTA PARA CREAR PEDIDOS - CORREGIDA CON PAYMENT METHOD
 app.post('/api/pedidos', async (req, res) => {
   try {
     console.log('📦 Recibiendo nuevo pedido...');
     console.log('📊 Headers:', req.headers);
-    console.log('📝 Body:', req.body);
+    console.log('📝 Body completo:', JSON.stringify(req.body, null, 2));
 
     const { 
       customer, 
@@ -142,7 +142,9 @@ app.post('/api/pedidos', async (req, res) => {
       total, 
       notas, 
       dia, 
-      hora 
+      hora,
+      paymentMethod, // 🆕 NUEVO CAMPO
+      paymentConfirmed // 🆕 NUEVO CAMPO
     } = req.body;
 
     // Validaciones mejoradas
@@ -161,14 +163,16 @@ app.post('/api/pedidos', async (req, res) => {
       liquidos: Array.isArray(liquidos) ? liquidos : [],
       frutas: Array.isArray(frutas) ? frutas : [],
       toppings: Array.isArray(toppings) ? toppings : [],
-      extras: Array.isArray(extras) ? extras : [], // ✅ Ahora como array
-      notas: notas || '', // ✅ Nuevo campo
+      extras: Array.isArray(extras) ? extras : [],
+      notas: notas || '',
       delivery: delivery ? delivery.toString() : 'recoger',
       punto: punto ? punto.toString() : '',
-      dia: dia || '', // ✅ Nuevo campo
-      hora: hora || '', // ✅ Nuevo campo
+      dia: dia || '',
+      hora: hora || '',
       phone: phone.toString().trim(),
       total: parseFloat(total) || 0,
+      paymentMethod: paymentMethod || 'efectivo', // 🆕 VALOR POR DEFECTO
+      paymentConfirmed: paymentConfirmed || false, // 🆕 VALOR POR DEFECTO
       status: 'Pendiente',
       createdAt: new Date()
     };
@@ -179,6 +183,7 @@ app.post('/api/pedidos', async (req, res) => {
     const savedOrder = await newOrder.save();
     
     console.log('✅ Pedido guardado ID:', savedOrder._id);
+    console.log('💳 Método de pago guardado:', savedOrder.paymentMethod);
 
     res.status(201).json({
       message: 'Pedido creado exitosamente',
@@ -192,6 +197,44 @@ app.post('/api/pedidos', async (req, res) => {
       error: 'Error al crear el pedido: ' + error.message,
       stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
     });
+  }
+});
+
+// 🆕 RUTA PARA ACTUALIZAR ESTADO DE PAGO
+app.patch('/api/pedidos/:id/payment', auth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { paymentConfirmed } = req.body;
+
+    console.log('💳 Actualizando estado de pago para pedido:', id);
+    console.log('📝 Nuevo estado de pago:', paymentConfirmed);
+
+    if (typeof paymentConfirmed !== 'boolean') {
+      return res.status(400).json({ 
+        error: 'paymentConfirmed debe ser un booleano (true/false)' 
+      });
+    }
+
+    const updatedOrder = await Order.findByIdAndUpdate(
+      id,
+      { paymentConfirmed },
+      { new: true }
+    );
+
+    if (!updatedOrder) {
+      return res.status(404).json({ error: 'Pedido no encontrado' });
+    }
+
+    console.log('✅ Estado de pago actualizado:', updatedOrder.paymentConfirmed);
+
+    res.json({
+      message: 'Estado de pago actualizado',
+      order: updatedOrder
+    });
+
+  } catch (error) {
+    console.error('❌ Error actualizando estado de pago:', error);
+    res.status(500).json({ error: 'Error al actualizar estado de pago: ' + error.message });
   }
 });
 
