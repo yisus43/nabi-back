@@ -688,3 +688,191 @@ app.listen(PORT, '0.0.0.0', () => {
   console.log(`📊 Entorno: ${process.env.NODE_ENV || 'development'}`);
   console.log(`✅ CORS configurado de forma robusta`);
 });
+
+// 🆕 RUTAS PARA PAQUETES
+app.get('/api/packages', async (req, res) => {
+  try {
+    console.log('📦 Obteniendo paquetes...');
+    const packages = await Package.find().sort({ order: 1, name: 1 });
+    
+    console.log(`✅ Paquetes encontrados: ${packages.length}`);
+    res.json(packages);
+  } catch (error) {
+    console.error('❌ Error obteniendo paquetes:', error);
+    res.status(500).json({ error: 'Error al obtener paquetes: ' + error.message });
+  }
+});
+
+app.get('/api/packages/public', async (req, res) => {
+  try {
+    const packages = await Package.find({ available: true })
+      .populate('ingredients')
+      .sort({ order: 1, name: 1 });
+    
+    res.json({
+      message: 'Paquetes públicos',
+      count: packages.length,
+      packages: packages
+    });
+  } catch (error) {
+    console.error('Error obteniendo paquetes públicos:', error);
+    res.status(500).json({ error: 'Error al obtener paquetes' });
+  }
+});
+
+app.post('/api/packages', auth, async (req, res) => {
+  try {
+    console.log('➕ Creando nuevo paquete...');
+    const { name, description, price, ingredients, available, order, icon } = req.body;
+    
+    if (!name || !price) {
+      return res.status(400).json({ error: 'Nombre y precio son requeridos' });
+    }
+
+    const newPackage = new Package({
+      name: name.trim(),
+      description: description || '',
+      price: price,
+      ingredients: ingredients || [],
+      available: available !== undefined ? available : true,
+      order: order || 0,
+      icon: icon || 'fas fa-box'
+    });
+    
+    const savedPackage = await newPackage.save();
+    console.log('✅ Paquete creado:', savedPackage.name);
+    
+    res.status(201).json(savedPackage);
+  } catch (error) {
+    console.error('❌ Error creando paquete:', error);
+    res.status(500).json({ error: 'Error al crear paquete: ' + error.message });
+  }
+});
+
+app.put('/api/packages/:id', auth, async (req, res) => {
+  try {
+    console.log('✏️ Actualizando paquete...');
+    const { id } = req.params;
+    const updateData = req.body;
+    
+    const updatedPackage = await Package.findByIdAndUpdate(
+      id, 
+      { ...updateData, updatedAt: new Date() }, 
+      { new: true, runValidators: true }
+    ).populate('ingredients');
+    
+    if (!updatedPackage) {
+      return res.status(404).json({ error: 'Paquete no encontrado' });
+    }
+    
+    console.log('✅ Paquete actualizado:', updatedPackage.name);
+    res.json(updatedPackage);
+  } catch (error) {
+    console.error('❌ Error actualizando paquete:', error);
+    res.status(500).json({ error: 'Error al actualizar paquete: ' + error.message });
+  }
+});
+
+app.delete('/api/packages/:id', auth, async (req, res) => {
+  try {
+    console.log('🗑️ Eliminando paquete...');
+    const { id } = req.params;
+    
+    const deletedPackage = await Package.findByIdAndDelete(id);
+    
+    if (!deletedPackage) {
+      return res.status(404).json({ error: 'Paquete no encontrado' });
+    }
+    
+    console.log('✅ Paquete eliminado:', deletedPackage.name);
+    res.json({ 
+      message: 'Paquete eliminado exitosamente',
+      deletedPackage: deletedPackage.name
+    });
+  } catch (error) {
+    console.error('❌ Error eliminando paquete:', error);
+    res.status(500).json({ error: 'Error al eliminar paquete: ' + error.message });
+  }
+});
+
+// 🆕 RUTA PARA INICIALIZAR PAQUETES POR DEFECTO
+app.post('/api/packages/initialize', auth, async (req, res) => {
+  try {
+    console.log('🔄 Inicializando paquetes por defecto...');
+    
+    // Primero obtener todos los ingredientes para asignar IDs
+    const allIngredients = await Ingredient.find();
+    
+    const defaultPackages = [
+      {
+        name: 'Chocolate',
+        description: 'Nutella + plátano + chispas de chocolate + oreo + nuez',
+        price: 15,
+        ingredients: allIngredients.filter(ing => 
+          ['Nutella', 'Plátano', 'Chispas chocolate', 'Oreo', 'Nuez'].includes(ing.name)
+        ).map(ing => ing._id),
+        available: true,
+        order: 1,
+        icon: 'fas fa-cookie-bite'
+      },
+      {
+        name: 'Fitness',
+        description: 'Granola + plátano + mermelada + nuez',
+        price: 10,
+        ingredients: allIngredients.filter(ing => 
+          ['Granola', 'Plátano', 'Mermelada', 'Nuez'].includes(ing.name)
+        ).map(ing => ing._id),
+        available: true,
+        order: 2,
+        icon: 'fas fa-dumbbell'
+      },
+      {
+        name: 'Fresita',
+        description: 'Fresa + bombones + chispas de colores',
+        price: 10,
+        ingredients: allIngredients.filter(ing => 
+          ['Fresa', 'Bombones', 'Chispas colores'].includes(ing.name)
+        ).map(ing => ing._id),
+        available: true,
+        order: 3,
+        icon: 'fas fa-strawberry'
+      },
+      {
+        name: 'Lechera',
+        description: 'Lechera + mazapán + plátano + nuez',
+        price: 25,
+        ingredients: allIngredients.filter(ing => 
+          ['Lechera', 'Mazapán', 'Plátano', 'Nuez'].includes(ing.name)
+        ).map(ing => ing._id),
+        available: true,
+        order: 4,
+        icon: 'fas fa-cow'
+      },
+      {
+        name: 'Gansito',
+        description: 'Chocolate + fresa + bombones + chispas',
+        price: 15,
+        ingredients: allIngredients.filter(ing => 
+          ['Chocolate Hersheys', 'Fresa', 'Bombones', 'Chispas chocolate'].includes(ing.name)
+        ).map(ing => ing._id),
+        available: true,
+        order: 5,
+        icon: 'fas fa-cake'
+      }
+    ];
+
+    await Package.deleteMany({});
+    const packages = await Package.insertMany(defaultPackages);
+    
+    console.log(`✅ ${packages.length} paquetes inicializados`);
+    
+    res.json({
+      message: 'Paquetes inicializados exitosamente',
+      count: packages.length,
+      packages: packages
+    });
+  } catch (error) {
+    console.error('❌ Error inicializando paquetes:', error);
+    res.status(500).json({ error: 'Error al inicializar paquetes: ' + error.message });
+  }
+});
