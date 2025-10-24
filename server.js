@@ -8,7 +8,8 @@ const jwt = require('jsonwebtoken');
 const Order = require('./models/order');
 const User = require('./models/user'); 
 const Ingredient = require('./models/Ingredient');
-const Config = require('./models/config'); // 🆕 IMPORTAR CONFIG
+const Config = require('./models/config');
+const Package = require('./models/package'); // 🆕 IMPORTAR MODELO DE PAQUETES
 const auth = require('./middleware/auth');
 const app = express();
 
@@ -650,11 +651,13 @@ app.get('/api/debug', async (req, res) => {
     const orderCount = await Order.countDocuments();
     const ingredientCount = await Ingredient.countDocuments();
     const configCount = await Config.countDocuments();
+    const packageCount = await Package.countDocuments();
     res.json({
       message: 'Debug endpoint',
       ordersInDB: orderCount,
       ingredientsInDB: ingredientCount,
       configsInDB: configCount,
+      packagesInDB: packageCount,
       timestamp: new Date().toISOString(),
       database: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected'
     });
@@ -663,37 +666,11 @@ app.get('/api/debug', async (req, res) => {
   }
 });
 
-// ✅ MANEJAR RUTAS NO ENCONTRADAS
-app.use('*', (req, res) => {
-  res.status(404).json({ 
-    error: 'Ruta no encontrada',
-    path: req.originalUrl,
-    method: req.method
-  });
-});
-
-// ✅ MANEJADOR DE ERRORES GLOBAL
-app.use((error, req, res, next) => {
-  console.error('🔥 Error global:', error);
-  res.status(500).json({ 
-    error: 'Error interno del servidor',
-    message: process.env.NODE_ENV === 'development' ? error.message : 'Algo salió mal'
-  });
-});
-
-// ✅ INICIAR SERVIDOR
-app.listen(PORT, '0.0.0.0', () => {
-  console.log(`🚀 Servidor Nabi Backend iniciado en puerto ${PORT}`);
-  console.log(`🌐 URL: http://localhost:${PORT}`);
-  console.log(`📊 Entorno: ${process.env.NODE_ENV || 'development'}`);
-  console.log(`✅ CORS configurado de forma robusta`);
-});
-
-// 🆕 RUTAS PARA PAQUETES
-app.get('/api/packages', async (req, res) => {
+// 🆕 RUTAS PARA PAQUETES (SIN DUPLICADOS)
+app.get('/api/packages', auth, async (req, res) => {
   try {
     console.log('📦 Obteniendo paquetes...');
-    const packages = await Package.find().sort({ order: 1, name: 1 });
+    const packages = await Package.find().populate('ingredients').sort({ order: 1, name: 1 });
     
     console.log(`✅ Paquetes encontrados: ${packages.length}`);
     res.json(packages);
@@ -875,4 +852,30 @@ app.post('/api/packages/initialize', auth, async (req, res) => {
     console.error('❌ Error inicializando paquetes:', error);
     res.status(500).json({ error: 'Error al inicializar paquetes: ' + error.message });
   }
+});
+
+// ✅ MANEJAR RUTAS NO ENCONTRADAS
+app.use('*', (req, res) => {
+  res.status(404).json({ 
+    error: 'Ruta no encontrada',
+    path: req.originalUrl,
+    method: req.method
+  });
+});
+
+// ✅ MANEJADOR DE ERRORES GLOBAL
+app.use((error, req, res, next) => {
+  console.error('🔥 Error global:', error);
+  res.status(500).json({ 
+    error: 'Error interno del servidor',
+    message: process.env.NODE_ENV === 'development' ? error.message : 'Algo salió mal'
+  });
+});
+
+// ✅ INICIAR SERVIDOR
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`🚀 Servidor Nabi Backend iniciado en puerto ${PORT}`);
+  console.log(`🌐 URL: http://localhost:${PORT}`);
+  console.log(`📊 Entorno: ${process.env.NODE_ENV || 'development'}`);
+  console.log(`✅ CORS configurado de forma robusta`);
 });
