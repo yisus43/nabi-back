@@ -8,6 +8,7 @@ const jwt = require('jsonwebtoken');
 const Order = require('./models/order');
 const User = require('./models/user'); 
 const Ingredient = require('./models/Ingredient');
+const Config = require('./models/config'); // 🆕 IMPORTAR CONFIG
 const auth = require('./middleware/auth');
 const app = express();
 
@@ -118,7 +119,7 @@ app.post('/api/auth/login', async (req, res) => {
   }
 });
 
-// 🔥 RUTA PARA CREAR PEDIDOS - MEJORADA CON CÓDIGO DE REFERENCIA
+// 🔥 RUTA PARA CREAR PEDIDOS - SIN CÓDIGO DE REFERENCIA
 app.post('/api/pedidos', async (req, res) => {
   try {
     console.log('📦 Recibiendo nuevo pedido...');
@@ -141,8 +142,7 @@ app.post('/api/pedidos', async (req, res) => {
       dia, 
       hora,
       paymentMethod,
-      paymentConfirmed,
-      codigoReferencia // 🆕 NUEVO CAMPO
+      paymentConfirmed
     } = req.body;
 
     // Validaciones mejoradas
@@ -153,9 +153,6 @@ app.post('/api/pedidos', async (req, res) => {
         received: { customer, quantity, package, phone }
       });
     }
-
-    // 🆕 GENERAR CÓDIGO DE REFERENCIA SI NO SE ENVÍA
-    const referenciaFinal = codigoReferencia || generarCodigoReferencia();
 
     const orderData = {
       customer: customer.toString().trim(),
@@ -174,7 +171,6 @@ app.post('/api/pedidos', async (req, res) => {
       total: parseFloat(total) || 0,
       paymentMethod: paymentMethod || 'efectivo',
       paymentConfirmed: paymentConfirmed || false,
-      codigoReferencia: referenciaFinal, // 🆕 GUARDAR CÓDIGO DE REFERENCIA
       status: 'Pendiente',
       createdAt: new Date()
     };
@@ -186,13 +182,11 @@ app.post('/api/pedidos', async (req, res) => {
     
     console.log('✅ Pedido guardado ID:', savedOrder._id);
     console.log('💳 Método de pago:', savedOrder.paymentMethod);
-    console.log('🔢 Código referencia:', savedOrder.codigoReferencia);
 
     res.status(201).json({
       message: 'Pedido creado exitosamente',
       orderId: savedOrder._id,
-      order: savedOrder,
-      codigoReferencia: savedOrder.codigoReferencia // 🆕 ENVIAR CÓDIGO EN RESPUESTA
+      order: savedOrder
     });
 
   } catch (error) {
@@ -203,14 +197,6 @@ app.post('/api/pedidos', async (req, res) => {
     });
   }
 });
-
-// 🆕 FUNCIÓN PARA GENERAR CÓDIGO DE REFERENCIA
-function generarCodigoReferencia() {
-  const fecha = new Date();
-  const timestamp = fecha.getTime().toString().slice(-6);
-  const random = Math.random().toString(36).substring(2, 5).toUpperCase();
-  return `NABI${timestamp}${random}`;
-}
 
 // 🆕 RUTA PARA ACTUALIZAR ESTADO DE PAGO
 app.patch('/api/pedidos/:id/payment', auth, async (req, res) => {
@@ -507,6 +493,142 @@ app.post('/api/ingredients/initialize', auth, async (req, res) => {
   }
 });
 
+// 🆕 RUTAS DE CONFIGURACIÓN
+app.get('/api/config/:key', auth, async (req, res) => {
+  try {
+    const { key } = req.params;
+    const config = await Config.findOne({ key });
+    
+    if (!config) {
+      return res.status(404).json({ error: 'Configuración no encontrada' });
+    }
+    
+    res.json(config);
+  } catch (error) {
+    console.error('Error obteniendo configuración:', error);
+    res.status(500).json({ error: 'Error al obtener configuración' });
+  }
+});
+
+// 🆕 RUTA PÚBLICA PARA CONFIGURACIÓN (PARA EL HTML)
+app.get('/api/config/public/:key', async (req, res) => {
+  try {
+    const { key } = req.params;
+    const config = await Config.findOne({ key });
+    
+    if (!config) {
+      return res.status(404).json({ error: 'Configuración no encontrada' });
+    }
+    
+    res.json(config.value);
+  } catch (error) {
+    console.error('Error obteniendo configuración pública:', error);
+    res.status(500).json({ error: 'Error al obtener configuración' });
+  }
+});
+
+app.put('/api/config/:key', auth, async (req, res) => {
+  try {
+    const { key } = req.params;
+    const { value, description } = req.body;
+    
+    const config = await Config.findOneAndUpdate(
+      { key },
+      { 
+        value,
+        description: description || '',
+        updatedAt: new Date()
+      },
+      { 
+        new: true, 
+        upsert: true,
+        runValidators: true 
+      }
+    );
+    
+    res.json({
+      message: 'Configuración actualizada',
+      config
+    });
+  } catch (error) {
+    console.error('Error actualizando configuración:', error);
+    res.status(500).json({ error: 'Error al actualizar configuración' });
+  }
+});
+
+// 🆕 RUTA PARA INICIALIZAR CONFIGURACIÓN POR DEFECTO
+app.post('/api/config/initialize', auth, async (req, res) => {
+  try {
+    console.log('🔄 Inicializando configuración por defecto...');
+    
+    const defaultConfigs = [
+      {
+        key: 'horarios',
+        value: {
+          lunes: { activo: true, inicio: '09:00', fin: '12:00' },
+          martes: { activo: true, inicio: '12:00', fin: '13:00' },
+          miercoles: { activo: true, inicio: '09:00', fin: '12:00' },
+          jueves: { activo: true, inicio: '12:00', fin: '13:00' },
+          viernes: { activo: true, inicio: '13:00', fin: '14:00' },
+          sabado: { activo: false, inicio: '09:00', fin: '12:00' },
+          domingo: { activo: false, inicio: '09:00', fin: '12:00' }
+        },
+        description: 'Horarios de atención y recogida'
+      },
+      {
+        key: 'precios',
+        value: {
+          cantidad_15: 20,
+          cantidad_20: 25,
+          cantidad_25: 30,
+          precio_extra: 5,
+          paquetes: {
+            chocolate: 15,
+            fitness: 10,
+            fresita: 10,
+            lechera: 25,
+            gansito: 15
+          }
+        },
+        description: 'Precios de productos y paquetes'
+      },
+      {
+        key: 'puntos_entrega',
+        value: [
+          'Puerta de EMA 1',
+          'Puerta de EMA 2',
+          'Puerta de EMA 3',
+          'Puerta de EMA 4',
+          'Puerta de EMA 5',
+          'Puerta de EMA 6',
+          'Puerta de EMA 7',
+          'Puerta de EMA 8',
+          'Puerta de EMA 9',
+          'Puerta de EMA 10',
+          'Cafetería',
+          'Oxxo',
+          'Lobo'
+        ],
+        description: 'Puntos de entrega disponibles'
+      }
+    ];
+    
+    await Config.deleteMany({});
+    const configs = await Config.insertMany(defaultConfigs);
+    
+    console.log(`✅ ${configs.length} configuraciones inicializadas`);
+    
+    res.json({
+      message: 'Configuración inicializada exitosamente',
+      count: configs.length,
+      configs
+    });
+  } catch (error) {
+    console.error('❌ Error inicializando configuración:', error);
+    res.status(500).json({ error: 'Error al inicializar configuración' });
+  }
+});
+
 // ✅ RUTA PARA OBTENER PEDIDOS PÚBLICOS (SIN AUTENTICACIÓN)
 app.get('/api/pedidos/public', async (req, res) => {
   try {
@@ -527,10 +649,12 @@ app.get('/api/debug', async (req, res) => {
   try {
     const orderCount = await Order.countDocuments();
     const ingredientCount = await Ingredient.countDocuments();
+    const configCount = await Config.countDocuments();
     res.json({
       message: 'Debug endpoint',
       ordersInDB: orderCount,
       ingredientsInDB: ingredientCount,
+      configsInDB: configCount,
       timestamp: new Date().toISOString(),
       database: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected'
     });
