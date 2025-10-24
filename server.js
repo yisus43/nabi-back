@@ -9,7 +9,7 @@ const Order = require('./models/order');
 const User = require('./models/user'); 
 const Ingredient = require('./models/Ingredient');
 const Config = require('./models/config');
-const Package = require('./models/package'); // 🆕 IMPORTAR MODELO DE PAQUETES
+const Package = require('./models/package');
 const auth = require('./middleware/auth');
 const app = express();
 
@@ -494,7 +494,7 @@ app.post('/api/ingredients/initialize', auth, async (req, res) => {
   }
 });
 
-// 🆕 RUTAS DE CONFIGURACIÓN
+// 🆕 RUTAS DE CONFIGURACIÓN - CORREGIDAS
 app.get('/api/config/:key', auth, async (req, res) => {
   try {
     const { key } = req.params;
@@ -511,22 +511,81 @@ app.get('/api/config/:key', auth, async (req, res) => {
   }
 });
 
-// 🆕 RUTA PÚBLICA PARA CONFIGURACIÓN (PARA EL HTML)
+// 🆕 RUTA PÚBLICA PARA CONFIGURACIÓN (PARA EL HTML) - CORREGIDA
 app.get('/api/config/public/:key', async (req, res) => {
   try {
     const { key } = req.params;
+    console.log(`📡 Solicitando configuración pública para: ${key}`);
+    
     const config = await Config.findOne({ key });
     
     if (!config) {
-      return res.status(404).json({ error: 'Configuración no encontrada' });
+      console.log(`❌ Configuración ${key} no encontrada en BD`);
+      // Devolver valores por defecto en lugar de error 404
+      const defaultConfig = getDefaultConfig(key);
+      return res.json(defaultConfig);
     }
     
+    console.log(`✅ Configuración ${key} encontrada:`, config.value);
     res.json(config.value);
+    
   } catch (error) {
-    console.error('Error obteniendo configuración pública:', error);
-    res.status(500).json({ error: 'Error al obtener configuración' });
+    console.error(`❌ Error obteniendo configuración pública ${key}:`, error);
+    // En caso de error, devolver valores por defecto
+    const defaultConfig = getDefaultConfig(key);
+    res.json(defaultConfig);
   }
 });
+
+// 🆕 FUNCIÓN PARA CONFIGURACIÓN POR DEFECTO
+function getDefaultConfig(key) {
+  console.log(`🔄 Usando configuración por defecto para: ${key}`);
+  
+  switch(key) {
+    case 'horarios':
+      return {
+        lunes: { activo: true, inicio: '09:00', fin: '12:00' },
+        martes: { activo: true, inicio: '12:00', fin: '13:00' },
+        miércoles: { activo: true, inicio: '09:00', fin: '12:00' },
+        jueves: { activo: true, inicio: '12:00', fin: '13:00' },
+        viernes: { activo: true, inicio: '13:00', fin: '14:00' },
+        sábado: { activo: false, inicio: '09:00', fin: '12:00' },
+        domingo: { activo: false, inicio: '09:00', fin: '12:00' }
+      };
+    case 'precios':
+      return {
+        cantidad_15: 20,
+        cantidad_20: 25,
+        cantidad_25: 30,
+        precio_extra: 5,
+        paquetes: {
+          Chocolate: 15,
+          Fitness: 10,
+          Fresita: 10,
+          Lechera: 25,
+          Gansito: 15
+        }
+      };
+    case 'puntos_entrega':
+      return [
+        'Puerta de EMA 1',
+        'Puerta de EMA 2',
+        'Puerta de EMA 3',
+        'Puerta de EMA 4',
+        'Puerta de EMA 5',
+        'Puerta de EMA 6',
+        'Puerta de EMA 7',
+        'Puerta de EMA 8',
+        'Puerta de EMA 9',
+        'Puerta de EMA 10',
+        'Cafetería',
+        'Oxxo',
+        'Lobo'
+      ];
+    default:
+      return {};
+  }
+}
 
 app.put('/api/config/:key', auth, async (req, res) => {
   try {
@@ -557,7 +616,7 @@ app.put('/api/config/:key', auth, async (req, res) => {
   }
 });
 
-// 🆕 RUTA PARA INICIALIZAR CONFIGURACIÓN POR DEFECTO
+// 🆕 RUTA PARA INICIALIZAR CONFIGURACIÓN POR DEFECTO - CORREGIDA
 app.post('/api/config/initialize', auth, async (req, res) => {
   try {
     console.log('🔄 Inicializando configuración por defecto...');
@@ -568,10 +627,10 @@ app.post('/api/config/initialize', auth, async (req, res) => {
         value: {
           lunes: { activo: true, inicio: '09:00', fin: '12:00' },
           martes: { activo: true, inicio: '12:00', fin: '13:00' },
-          miercoles: { activo: true, inicio: '09:00', fin: '12:00' },
+          miércoles: { activo: true, inicio: '09:00', fin: '12:00' },
           jueves: { activo: true, inicio: '12:00', fin: '13:00' },
           viernes: { activo: true, inicio: '13:00', fin: '14:00' },
-          sabado: { activo: false, inicio: '09:00', fin: '12:00' },
+          sábado: { activo: false, inicio: '09:00', fin: '12:00' },
           domingo: { activo: false, inicio: '09:00', fin: '12:00' }
         },
         description: 'Horarios de atención y recogida'
@@ -584,11 +643,11 @@ app.post('/api/config/initialize', auth, async (req, res) => {
           cantidad_25: 30,
           precio_extra: 5,
           paquetes: {
-            chocolate: 15,
-            fitness: 10,
-            fresita: 10,
-            lechera: 25,
-            gansito: 15
+            Chocolate: 15,
+            Fitness: 10,
+            Fresita: 10,
+            Lechera: 25,
+            Gansito: 15
           }
         },
         description: 'Precios de productos y paquetes'
