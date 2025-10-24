@@ -4,7 +4,8 @@ const IngredientSchema = new mongoose.Schema({
   name: {
     type: String,
     required: true,
-    trim: true
+    trim: true,
+    unique: true // 🆕 EVITAR DUPLICADOS
   },
   category: {
     type: String,
@@ -43,5 +44,9 @@ IngredientSchema.pre('save', function(next) {
   this.updatedAt = Date.now();
   next();
 });
+
+// Índices para mejor rendimiento
+IngredientSchema.index({ category: 1, order: 1 });
+IngredientSchema.index({ available: 1 });
 
 module.exports = mongoose.model('Ingredient', IngredientSchema);

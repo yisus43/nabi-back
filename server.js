@@ -7,7 +7,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const Order = require('./models/order');
 const User = require('./models/user'); 
-const Ingredient = require('./models/Ingredient'); // 🆕 NUEVO
+const Ingredient = require('./models/Ingredient');
 const auth = require('./middleware/auth');
 const app = express();
 
@@ -17,7 +17,6 @@ const PORT = process.env.PORT || 3000;
 // ✅ CONFIGURACIÓN CORS ROBUSTA
 app.use(cors({
   origin: function (origin, callback) {
-    // Permitir todos los orígenes
     callback(null, true);
   },
   credentials: true,
@@ -25,13 +24,10 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'Origin', 'X-Requested-With']
 }));
 
-// ✅ MANEJAR PREFLIGHT CORS
 app.options('*', cors());
-
 app.use(helmet({
   crossOriginResourcePolicy: { policy: "cross-origin" }
 }));
-
 app.use(express.json({ limit: '10mb' }));
 
 // ✅ CONEXIÓN MONGODB
@@ -122,7 +118,7 @@ app.post('/api/auth/login', async (req, res) => {
   }
 });
 
-// 🔥 RUTA PARA CREAR PEDIDOS - CORREGIDA CON PAYMENT METHOD
+// 🔥 RUTA PARA CREAR PEDIDOS - MEJORADA CON CÓDIGO DE REFERENCIA
 app.post('/api/pedidos', async (req, res) => {
   try {
     console.log('📦 Recibiendo nuevo pedido...');
@@ -144,8 +140,9 @@ app.post('/api/pedidos', async (req, res) => {
       notas, 
       dia, 
       hora,
-      paymentMethod, // 🆕 NUEVO CAMPO
-      paymentConfirmed // 🆕 NUEVO CAMPO
+      paymentMethod,
+      paymentConfirmed,
+      codigoReferencia // 🆕 NUEVO CAMPO
     } = req.body;
 
     // Validaciones mejoradas
@@ -156,6 +153,9 @@ app.post('/api/pedidos', async (req, res) => {
         received: { customer, quantity, package, phone }
       });
     }
+
+    // 🆕 GENERAR CÓDIGO DE REFERENCIA SI NO SE ENVÍA
+    const referenciaFinal = codigoReferencia || generarCodigoReferencia();
 
     const orderData = {
       customer: customer.toString().trim(),
@@ -172,8 +172,9 @@ app.post('/api/pedidos', async (req, res) => {
       hora: hora || '',
       phone: phone.toString().trim(),
       total: parseFloat(total) || 0,
-      paymentMethod: paymentMethod || 'efectivo', // 🆕 VALOR POR DEFECTO
-      paymentConfirmed: paymentConfirmed || false, // 🆕 VALOR POR DEFECTO
+      paymentMethod: paymentMethod || 'efectivo',
+      paymentConfirmed: paymentConfirmed || false,
+      codigoReferencia: referenciaFinal, // 🆕 GUARDAR CÓDIGO DE REFERENCIA
       status: 'Pendiente',
       createdAt: new Date()
     };
@@ -184,12 +185,14 @@ app.post('/api/pedidos', async (req, res) => {
     const savedOrder = await newOrder.save();
     
     console.log('✅ Pedido guardado ID:', savedOrder._id);
-    console.log('💳 Método de pago guardado:', savedOrder.paymentMethod);
+    console.log('💳 Método de pago:', savedOrder.paymentMethod);
+    console.log('🔢 Código referencia:', savedOrder.codigoReferencia);
 
     res.status(201).json({
       message: 'Pedido creado exitosamente',
       orderId: savedOrder._id,
-      order: savedOrder
+      order: savedOrder,
+      codigoReferencia: savedOrder.codigoReferencia // 🆕 ENVIAR CÓDIGO EN RESPUESTA
     });
 
   } catch (error) {
@@ -200,6 +203,14 @@ app.post('/api/pedidos', async (req, res) => {
     });
   }
 });
+
+// 🆕 FUNCIÓN PARA GENERAR CÓDIGO DE REFERENCIA
+function generarCodigoReferencia() {
+  const fecha = new Date();
+  const timestamp = fecha.getTime().toString().slice(-6);
+  const random = Math.random().toString(36).substring(2, 5).toUpperCase();
+  return `NABI${timestamp}${random}`;
+}
 
 // 🆕 RUTA PARA ACTUALIZAR ESTADO DE PAGO
 app.patch('/api/pedidos/:id/payment', auth, async (req, res) => {
@@ -320,28 +331,6 @@ app.delete('/api/pedidos/status/:status', auth, async (req, res) => {
   } catch (error) {
     console.error('❌ Error eliminando pedidos por estado:', error);
     res.status(500).json({ error: 'Error al eliminar pedidos: ' + error.message });
-  }
-});
-
-app.delete('/api/pedidos/completed', auth, async (req, res) => {
-  try {
-    console.log('🗑️ SOLICITUD PARA ELIMINAR PEDIDOS COMPLETADOS');
-    console.log('🔐 Usuario autenticado:', req.user);
-
-    const result = await Order.deleteMany({ 
-      status: { $in: ['Entregado', 'Cancelado'] } 
-    });
-    
-    console.log(`✅ Pedidos completados eliminados: ${result.deletedCount}`);
-    
-    res.json({
-      message: 'Pedidos completados eliminados exitosamente',
-      deletedCount: result.deletedCount
-    });
-
-  } catch (error) {
-    console.error('❌ Error eliminando pedidos completados:', error);
-    res.status(500).json({ error: 'Error al eliminar pedidos completados: ' + error.message });
   }
 });
 
@@ -502,10 +491,7 @@ app.post('/api/ingredients/initialize', auth, async (req, res) => {
       { name: 'Helado', category: 'extras', price: 5, hasExtraCost: true, order: 4 }
     ];
 
-    // Eliminar ingredientes existentes
     await Ingredient.deleteMany({});
-    
-    // Insertar nuevos ingredientes
     const ingredients = await Ingredient.insertMany(defaultIngredients);
     
     console.log(`✅ ${ingredients.length} ingredientes inicializados`);
