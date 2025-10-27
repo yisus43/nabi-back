@@ -102,19 +102,62 @@ function broadcastToAll(message) {
 // ✅ PUERTO CORRECTO
 const PORT = process.env.PORT || 3000;
 
-// ✅ CONFIGURACIÓN CORS ACTUALIZADA CON GITHUB PAGES
+// ✅ CONFIGURACIÓN CORS COMPLETA PARA FLUTTER WEB Y TODOS LOS ENTORNOS
 app.use(cors({
-  origin: [
-    'https://yisus43.github.io',  // ✅ Tu dominio de GitHub Pages
-    'http://localhost:3000',      // ✅ Desarrollo local
-    'http://localhost:8080',      // ✅ Flutter web local
-    'https://nabi-back.onrender.com' // ✅ Tu backend
-  ],
+  origin: function (origin, callback) {
+    // ✅ Permitir requests sin origin (como mobile apps o Postman)
+    if (!origin) return callback(null, true);
+    
+    // ✅ Lista de dominios permitidos
+    const allowedOrigins = [
+      'https://yisus43.github.io',
+      'https://nabi-back.onrender.com',
+      'http://localhost:3000',
+      'http://localhost:8080',
+      'http://localhost:5000',
+      'http://127.0.0.1:3000',
+      'http://127.0.0.1:8080',
+      'http://127.0.0.1:5000',
+      // ✅ Todos los puertos de Flutter web development
+      /http:\/\/localhost:\d+$/,
+      /http:\/\/127\.0\.0\.1:\d+$/,
+      /http:\/\/192\.168\.\d+\.\d+:\d+$/ // Para desarrollo en red local
+    ];
+
+    // ✅ Verificar si el origin está permitido
+    if (allowedOrigins.some(allowed => {
+      if (typeof allowed === 'string') {
+        return origin === allowed;
+      } else if (allowed instanceof RegExp) {
+        return allowed.test(origin);
+      }
+      return false;
+    })) {
+      return callback(null, true);
+    } else {
+      console.log('🚫 CORS bloqueado para origin:', origin);
+      return callback(new Error('Not allowed by CORS'));
+    }
+  },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH', 'HEAD'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'Origin', 'X-Requested-With']
+  allowedHeaders: [
+    'Content-Type', 
+    'Authorization', 
+    'Accept', 
+    'Origin', 
+    'X-Requested-With',
+    'X-Requested-By',
+    'Access-Control-Request-Headers',
+    'Access-Control-Request-Method'
+  ],
+  exposedHeaders: ['Authorization'],
+  preflightContinue: false,
+  optionsSuccessStatus: 204
 }));
 
+// ✅ MANEJAR PREFLIGHT OPTIONS EXPLÍCITAMENTE
+app.options('*', cors());
 app.options('*', cors());
 app.use(helmet({
   crossOriginResourcePolicy: { policy: "cross-origin" }
@@ -1069,6 +1112,18 @@ app.use((error, req, res, next) => {
     message: process.env.NODE_ENV === 'development' ? error.message : 'Algo salió mal'
   });
 });
+// 🆕 ENDPOINT DE PRUEBA CORS
+app.get('/api/cors-test', (req, res) => {
+  res.json({
+    message: '✅ CORS funcionando correctamente',
+    timestamp: new Date().toISOString(),
+    allowedOrigins: [
+      'https://yisus43.github.io',
+      'http://localhost:*',
+      'http://127.0.0.1:*'
+    ]
+  });
+});
 
 // ✅ INICIAR SERVIDOR CON WEBSOCKETS
 server.listen(PORT, '0.0.0.0', () => {
@@ -1076,5 +1131,11 @@ server.listen(PORT, '0.0.0.0', () => {
   console.log(`🌐 URL: http://localhost:${PORT}`);
   console.log(`🔗 WebSockets: ws://localhost:${PORT}`);
   console.log(`📊 Entorno: ${process.env.NODE_ENV || 'development'}`);
-  console.log(`✅ CORS configurado de forma robusta`);
+  console.log(`✅ CORS configurado para Flutter Web y todos los entornos`);
+  console.log(`🌍 Dominios permitidos:`);
+  console.log(`   - https://yisus43.github.io`);
+  console.log(`   - https://nabi-back.onrender.com`);
+  console.log(`   - http://localhost:* (todos los puertos)`);
+  console.log(`   - http://127.0.0.1:* (todos los puertos)`);
+
 });
