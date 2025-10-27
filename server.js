@@ -99,23 +99,17 @@ function broadcastToAll(message) {
   console.log(`📢 Mensaje broadcast enviado a ${sentCount} clientes:`, message.tipo);
 }
 
-// ✅ FUNCIÓN PARA ENVIAR A UN USUARIO ESPECÍFICO
-function sendToUser(userId, message) {
-  const ws = activeConnections.get(userId);
-  if (ws && ws.readyState === WebSocket.OPEN) {
-    ws.send(JSON.stringify(message));
-    console.log(`📨 Mensaje enviado a usuario ${userId}:`, message.tipo);
-  }
-}
-
 // ✅ PUERTO CORRECTO
 const PORT = process.env.PORT || 3000;
 
-// ✅ CONFIGURACIÓN CORS ROBUSTA
+// ✅ CONFIGURACIÓN CORS ACTUALIZADA CON GITHUB PAGES
 app.use(cors({
-  origin: function (origin, callback) {
-    callback(null, true);
-  },
+  origin: [
+    'https://yisus43.github.io',  // ✅ Tu dominio de GitHub Pages
+    'http://localhost:3000',      // ✅ Desarrollo local
+    'http://localhost:8080',      // ✅ Flutter web local
+    'https://nabi-back.onrender.com' // ✅ Tu backend
+  ],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH', 'HEAD'],
   allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'Origin', 'X-Requested-With']
@@ -167,7 +161,7 @@ app.get('/health', (req, res) => {
   });
 });
 
-// 🔥 RUTAS DE AUTENTICACIÓN (se mantienen igual)
+// 🔥 RUTAS DE AUTENTICACIÓN
 app.post('/api/auth/login', async (req, res) => {
   try {
     console.log('🔐 SOLICITUD DE LOGIN RECIBIDA:', req.body);
@@ -461,6 +455,24 @@ app.get('/api/ingredients', async (req, res) => {
   }
 });
 
+// 🆕 RUTA PÚBLICA PARA INGREDIENTES
+app.get('/api/ingredients/public', async (req, res) => {
+  try {
+    console.log('🥗 Obteniendo ingredientes públicos...');
+    const ingredients = await Ingredient.find({ available: true })
+      .sort({ category: 1, order: 1, name: 1 });
+    
+    res.json({
+      message: 'Ingredientes públicos',
+      count: ingredients.length,
+      ingredients: ingredients
+    });
+  } catch (error) {
+    console.error('❌ Error obteniendo ingredientes públicos:', error);
+    res.status(500).json({ error: 'Error al obtener ingredientes públicos: ' + error.message });
+  }
+});
+
 app.post('/api/ingredients', auth, async (req, res) => {
   try {
     console.log('➕ Creando nuevo ingrediente...');
@@ -631,6 +643,82 @@ app.get('/api/config/:key', auth, async (req, res) => {
   }
 });
 
+// 🆕 RUTA PÚBLICA PARA CONFIGURACIÓN
+app.get('/api/config/public/:key', async (req, res) => {
+  try {
+    const { key } = req.params;
+    console.log(`📡 Solicitando configuración pública para: ${key}`);
+    
+    const config = await Config.findOne({ key });
+    
+    if (!config) {
+      console.log(`❌ Configuración ${key} no encontrada en BD`);
+      // Devolver valores por defecto en lugar de error 404
+      const defaultConfig = getDefaultConfig(key);
+      return res.json(defaultConfig);
+    }
+    
+    console.log(`✅ Configuración ${key} encontrada:`, config.value);
+    res.json(config.value);
+    
+  } catch (error) {
+    console.error(`❌ Error obteniendo configuración pública ${key}:`, error);
+    // En caso de error, devolver valores por defecto
+    const defaultConfig = getDefaultConfig(key);
+    res.json(defaultConfig);
+  }
+});
+
+// 🆕 FUNCIÓN PARA CONFIGURACIÓN POR DEFECTO
+function getDefaultConfig(key) {
+  console.log(`🔄 Usando configuración por defecto para: ${key}`);
+  
+  switch(key) {
+    case 'horarios':
+      return {
+        lunes: { activo: true, inicio: '09:00', fin: '12:00' },
+        martes: { activo: true, inicio: '12:00', fin: '13:00' },
+        miércoles: { activo: true, inicio: '09:00', fin: '12:00' },
+        jueves: { activo: true, inicio: '12:00', fin: '13:00' },
+        viernes: { activo: true, inicio: '13:00', fin: '14:00' },
+        sábado: { activo: false, inicio: '09:00', fin: '12:00' },
+        domingo: { activo: false, inicio: '09:00', fin: '12:00' }
+      };
+    case 'precios':
+      return {
+        cantidad_15: 20,
+        cantidad_20: 25,
+        cantidad_25: 30,
+        precio_extra: 5,
+        paquetes: {
+          Chocolate: 15,
+          Fitness: 10,
+          Fresita: 10,
+          Lechera: 25,
+          Gansito: 15
+        }
+      };
+    case 'puntos_entrega':
+      return [
+        'Puerta de EMA 1',
+        'Puerta de EMA 2',
+        'Puerta de EMA 3',
+        'Puerta de EMA 4',
+        'Puerta de EMA 5',
+        'Puerta de EMA 6',
+        'Puerta de EMA 7',
+        'Puerta de EMA 8',
+        'Puerta de EMA 9',
+        'Puerta de EMA 10',
+        'Cafetería',
+        'Oxxo',
+        'Lobo'
+      ];
+    default:
+      return {};
+  }
+}
+
 app.put('/api/config/:key', auth, async (req, res) => {
   try {
     const { key } = req.params;
@@ -667,6 +755,79 @@ app.put('/api/config/:key', auth, async (req, res) => {
   }
 });
 
+// 🆕 RUTA PARA INICIALIZAR CONFIGURACIÓN POR DEFECTO
+app.post('/api/config/initialize', auth, async (req, res) => {
+  try {
+    console.log('🔄 Inicializando configuración por defecto...');
+    
+    const defaultConfigs = [
+      {
+        key: 'horarios',
+        value: {
+          lunes: { activo: true, inicio: '09:00', fin: '12:00' },
+          martes: { activo: true, inicio: '12:00', fin: '13:00' },
+          miércoles: { activo: true, inicio: '09:00', fin: '12:00' },
+          jueves: { activo: true, inicio: '12:00', fin: '13:00' },
+          viernes: { activo: true, inicio: '13:00', fin: '14:00' },
+          sábado: { activo: false, inicio: '09:00', fin: '12:00' },
+          domingo: { activo: false, inicio: '09:00', fin: '12:00' }
+        },
+        description: 'Horarios de atención y recogida'
+      },
+      {
+        key: 'precios',
+        value: {
+          cantidad_15: 20,
+          cantidad_20: 25,
+          cantidad_25: 30,
+          precio_extra: 5,
+          paquetes: {
+            Chocolate: 15,
+            Fitness: 10,
+            Fresita: 10,
+            Lechera: 25,
+            Gansito: 15
+          }
+        },
+        description: 'Precios de productos y paquetes'
+      },
+      {
+        key: 'puntos_entrega',
+        value: [
+          'Puerta de EMA 1',
+          'Puerta de EMA 2',
+          'Puerta de EMA 3',
+          'Puerta de EMA 4',
+          'Puerta de EMA 5',
+          'Puerta de EMA 6',
+          'Puerta de EMA 7',
+          'Puerta de EMA 8',
+          'Puerta de EMA 9',
+          'Puerta de EMA 10',
+          'Cafetería',
+          'Oxxo',
+          'Lobo'
+        ],
+        description: 'Puntos de entrega disponibles'
+      }
+    ];
+    
+    await Config.deleteMany({});
+    const configs = await Config.insertMany(defaultConfigs);
+    
+    console.log(`✅ ${configs.length} configuraciones inicializadas`);
+    
+    res.json({
+      message: 'Configuración inicializada exitosamente',
+      count: configs.length,
+      configs
+    });
+  } catch (error) {
+    console.error('❌ Error inicializando configuración:', error);
+    res.status(500).json({ error: 'Error al inicializar configuración' });
+  }
+});
+
 // 🆕 RUTAS PARA PAQUETES - CON WEBSOCKET
 app.get('/api/packages', auth, async (req, res) => {
   try {
@@ -678,6 +839,27 @@ app.get('/api/packages', auth, async (req, res) => {
   } catch (error) {
     console.error('❌ Error obteniendo paquetes:', error);
     res.status(500).json({ error: 'Error al obtener paquetes: ' + error.message });
+  }
+});
+
+// 🆕 RUTA PÚBLICA PARA PAQUETES (PARA LA PÁGINA WEB) - ¡ESTA ES LA QUE FALTABA!
+app.get('/api/packages/public', async (req, res) => {
+  try {
+    console.log('📦 Obteniendo paquetes públicos...');
+    const packages = await Package.find({ available: true })
+      .populate('ingredients')
+      .sort({ order: 1, name: 1 });
+    
+    res.json({
+      message: 'Paquetes públicos',
+      count: packages.length,
+      packages: packages
+    });
+  } catch (error) {
+    console.error('❌ Error obteniendo paquetes públicos:', error);
+    res.status(500).json({ 
+      error: 'Error al obtener paquetes públicos: ' + error.message 
+    });
   }
 });
 
@@ -876,18 +1058,7 @@ app.use('*', (req, res) => {
     method: req.method
   });
 });
-// ✅ CONFIGURACIÓN CORS ACTUALIZADA CON GITHUB PAGES
-app.use(cors({
-  origin: [
-    'https://yisus43.github.io',  // ✅ Tu dominio de GitHub Pages
-    'http://localhost:3000',      // ✅ Desarrollo local
-    'http://localhost:8080',      // ✅ Flutter web local
-    'https://nabi-back.onrender.com' // ✅ Tu backend
-  ],
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH', 'HEAD'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'Origin', 'X-Requested-With']
-}));
+
 // ✅ MANEJADOR DE ERRORES GLOBAL
 app.use((error, req, res, next) => {
   console.error('🔥 Error global:', error);
