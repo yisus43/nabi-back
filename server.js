@@ -876,7 +876,18 @@ app.use('*', (req, res) => {
     method: req.method
   });
 });
-
+// ✅ CONFIGURACIÓN CORS ACTUALIZADA CON GITHUB PAGES
+app.use(cors({
+  origin: [
+    'https://yisus43.github.io',  // ✅ Tu dominio de GitHub Pages
+    'http://localhost:3000',      // ✅ Desarrollo local
+    'http://localhost:8080',      // ✅ Flutter web local
+    'https://nabi-back.onrender.com' // ✅ Tu backend
+  ],
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH', 'HEAD'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'Origin', 'X-Requested-With']
+}));
 // ✅ MANEJADOR DE ERRORES GLOBAL
 app.use((error, req, res, next) => {
   console.error('🔥 Error global:', error);
