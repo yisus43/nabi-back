@@ -5,6 +5,8 @@ const cors = require('cors');
 const helmet = require('helmet');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const http = require('http');
+const WebSocket = require('ws');
 const Order = require('./models/order');
 const User = require('./models/user'); 
 const Ingredient = require('./models/Ingredient');
@@ -12,6 +14,99 @@ const Config = require('./models/config');
 const Package = require('./models/package');
 const auth = require('./middleware/auth');
 const app = express();
+
+// ✅ CREAR SERVIDOR HTTP PARA WEBSOCKETS
+const server = http.createServer(app);
+const wss = new WebSocket.Server({ server });
+
+// ✅ ALMACENAR CONEXIONES ACTIVAS
+const activeConnections = new Map();
+
+// ✅ CONFIGURACIÓN WEBSOCKET
+wss.on('connection', (ws, req) => {
+  console.log('🔗 Nueva conexión WebSocket establecida');
+  
+  // Extraer token de la URL (ws://url?token=xxx)
+  const url = new URL(req.url, `http://${req.headers.host}`);
+  const token = url.searchParams.get('token');
+  
+  if (!token) {
+    console.log('❌ Conexión WebSocket rechazada: Sin token');
+    ws.close(1008, 'Token requerido');
+    return;
+  }
+
+  try {
+    // Verificar token
+    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback_secret');
+    const userId = decoded.userId;
+    
+    // Guardar conexión
+    activeConnections.set(userId, ws);
+    console.log(`✅ Usuario ${userId} conectado via WebSocket`);
+    
+    // Enviar mensaje de bienvenida
+    ws.send(JSON.stringify({
+      tipo: 'conexion_establecida',
+      mensaje: 'Conectado en tiempo real ✅'
+    }));
+
+    // Manejar mensajes del cliente
+    ws.on('message', (message) => {
+      try {
+        const data = JSON.parse(message);
+        console.log('📨 Mensaje WebSocket recibido:', data);
+        
+        // Aquí puedes manejar mensajes específicos del cliente si es necesario
+        if (data.tipo === 'ping') {
+          ws.send(JSON.stringify({ tipo: 'pong', timestamp: new Date().toISOString() }));
+        }
+      } catch (error) {
+        console.error('Error procesando mensaje WebSocket:', error);
+      }
+    });
+
+    // Manejar cierre de conexión
+    ws.on('close', () => {
+      activeConnections.delete(userId);
+      console.log(`🔌 Usuario ${userId} desconectado de WebSocket`);
+    });
+
+    // Manejar errores
+    ws.on('error', (error) => {
+      console.error('❌ Error WebSocket:', error);
+      activeConnections.delete(userId);
+    });
+
+  } catch (error) {
+    console.log('❌ Token WebSocket inválido:', error.message);
+    ws.close(1008, 'Token inválido');
+  }
+});
+
+// ✅ FUNCIÓN PARA ENVIAR MENSAJES A TODOS LOS CLIENTES
+function broadcastToAll(message) {
+  const messageStr = JSON.stringify(message);
+  let sentCount = 0;
+  
+  activeConnections.forEach((ws, userId) => {
+    if (ws.readyState === WebSocket.OPEN) {
+      ws.send(messageStr);
+      sentCount++;
+    }
+  });
+  
+  console.log(`📢 Mensaje broadcast enviado a ${sentCount} clientes:`, message.tipo);
+}
+
+// ✅ FUNCIÓN PARA ENVIAR A UN USUARIO ESPECÍFICO
+function sendToUser(userId, message) {
+  const ws = activeConnections.get(userId);
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    ws.send(JSON.stringify(message));
+    console.log(`📨 Mensaje enviado a usuario ${userId}:`, message.tipo);
+  }
+}
 
 // ✅ PUERTO CORRECTO
 const PORT = process.env.PORT || 3000;
@@ -59,18 +154,20 @@ app.get('/', (req, res) => {
   res.json({ 
     message: '🚀 API Nabi Backend funcionando!',
     environment: process.env.NODE_ENV || 'development',
-    database: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected'
+    database: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected',
+    websockets: activeConnections.size
   });
 });
 
 app.get('/health', (req, res) => {
   res.status(200).json({ 
     status: 'OK', 
-    database: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected'
+    database: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected',
+    websockets: activeConnections.size
   });
 });
 
-// 🔥 RUTAS DE AUTENTICACIÓN
+// 🔥 RUTAS DE AUTENTICACIÓN (se mantienen igual)
 app.post('/api/auth/login', async (req, res) => {
   try {
     console.log('🔐 SOLICITUD DE LOGIN RECIBIDA:', req.body);
@@ -120,12 +217,10 @@ app.post('/api/auth/login', async (req, res) => {
   }
 });
 
-// 🔥 RUTA PARA CREAR PEDIDOS - SIN CÓDIGO DE REFERENCIA
+// 🔥 RUTA PARA CREAR PEDIDOS - CON WEBSOCKET
 app.post('/api/pedidos', async (req, res) => {
   try {
     console.log('📦 Recibiendo nuevo pedido...');
-    console.log('📊 Headers:', req.headers);
-    console.log('📝 Body completo:', JSON.stringify(req.body, null, 2));
 
     const { 
       customer, 
@@ -182,7 +277,13 @@ app.post('/api/pedidos', async (req, res) => {
     const savedOrder = await newOrder.save();
     
     console.log('✅ Pedido guardado ID:', savedOrder._id);
-    console.log('💳 Método de pago:', savedOrder.paymentMethod);
+
+    // 🆕 NOTIFICAR VÍA WEBSOCKET
+    broadcastToAll({
+      tipo: 'nuevo_pedido',
+      datos: savedOrder,
+      timestamp: new Date().toISOString()
+    });
 
     res.status(201).json({
       message: 'Pedido creado exitosamente',
@@ -199,14 +300,13 @@ app.post('/api/pedidos', async (req, res) => {
   }
 });
 
-// 🆕 RUTA PARA ACTUALIZAR ESTADO DE PAGO
+// 🆕 RUTA PARA ACTUALIZAR ESTADO DE PAGO - CON WEBSOCKET
 app.patch('/api/pedidos/:id/payment', auth, async (req, res) => {
   try {
     const { id } = req.params;
     const { paymentConfirmed } = req.body;
 
     console.log('💳 Actualizando estado de pago para pedido:', id);
-    console.log('📝 Nuevo estado de pago:', paymentConfirmed);
 
     if (typeof paymentConfirmed !== 'boolean') {
       return res.status(400).json({ 
@@ -226,6 +326,17 @@ app.patch('/api/pedidos/:id/payment', auth, async (req, res) => {
 
     console.log('✅ Estado de pago actualizado:', updatedOrder.paymentConfirmed);
 
+    // 🆕 NOTIFICAR VÍA WEBSOCKET
+    broadcastToAll({
+      tipo: 'pago_actualizado',
+      datos: {
+        orderId: id,
+        paymentConfirmed: updatedOrder.paymentConfirmed,
+        order: updatedOrder
+      },
+      timestamp: new Date().toISOString()
+    });
+
     res.json({
       message: 'Estado de pago actualizado',
       order: updatedOrder
@@ -241,7 +352,6 @@ app.patch('/api/pedidos/:id/payment', auth, async (req, res) => {
 app.get('/api/pedidos', auth, async (req, res) => {
   try {
     console.log('📦 SOLICITUD DE PEDIDOS RECIBIDA');
-    console.log('🔐 Usuario autenticado:', req.user);
     
     const orders = await Order.find().sort({ createdAt: -1 });
     
@@ -280,6 +390,13 @@ app.patch('/api/pedidos/:id', auth, async (req, res) => {
       return res.status(404).json({ error: 'Pedido no encontrado' });
     }
 
+    // 🆕 NOTIFICAR VÍA WEBSOCKET
+    broadcastToAll({
+      tipo: 'estado_pedido_actualizado',
+      datos: updatedOrder,
+      timestamp: new Date().toISOString()
+    });
+
     res.json({
       message: 'Pedido actualizado',
       order: updatedOrder
@@ -291,13 +408,12 @@ app.patch('/api/pedidos/:id', auth, async (req, res) => {
   }
 });
 
-// 🆕 RUTAS PARA LIMPIAR PEDIDOS (CON AUTENTICACIÓN)
+// 🆕 RUTAS PARA LIMPIAR PEDIDOS - CON WEBSOCKET
 app.delete('/api/pedidos/status/:status', auth, async (req, res) => {
   try {
     const { status } = req.params;
     
     console.log(`🗑️ SOLICITUD PARA ELIMINAR PEDIDOS CON ESTADO: ${status}`);
-    console.log('🔐 Usuario autenticado:', req.user);
 
     const allowedStatus = ['Entregado', 'Cancelado'];
     if (!allowedStatus.includes(status)) {
@@ -310,6 +426,16 @@ app.delete('/api/pedidos/status/:status', auth, async (req, res) => {
     
     console.log(`✅ Pedidos ${status} eliminados: ${result.deletedCount}`);
     
+    // 🆕 NOTIFICAR VÍA WEBSOCKET
+    broadcastToAll({
+      tipo: 'pedidos_eliminados',
+      datos: {
+        status: status,
+        deletedCount: result.deletedCount
+      },
+      timestamp: new Date().toISOString()
+    });
+
     res.json({
       message: `Pedidos ${status} eliminados exitosamente`,
       deletedCount: result.deletedCount
@@ -321,27 +447,7 @@ app.delete('/api/pedidos/status/:status', auth, async (req, res) => {
   }
 });
 
-app.delete('/api/pedidos/all', auth, async (req, res) => {
-  try {
-    console.log('🗑️ SOLICITUD PARA ELIMINAR TODOS LOS PEDIDOS');
-    console.log('🔐 Usuario autenticado:', req.user);
-
-    const result = await Order.deleteMany({});
-    
-    console.log(`✅ Todos los pedidos eliminados: ${result.deletedCount}`);
-    
-    res.json({
-      message: 'Todos los pedidos eliminados exitosamente',
-      deletedCount: result.deletedCount
-    });
-
-  } catch (error) {
-    console.error('❌ Error eliminando todos los pedidos:', error);
-    res.status(500).json({ error: 'Error al eliminar todos los pedidos: ' + error.message });
-  }
-});
-
-// 🆕 RUTAS PARA INGREDIENTES
+// 🆕 RUTAS PARA INGREDIENTES - CON WEBSOCKET
 app.get('/api/ingredients', async (req, res) => {
   try {
     console.log('🥗 Obteniendo ingredientes...');
@@ -352,22 +458,6 @@ app.get('/api/ingredients', async (req, res) => {
   } catch (error) {
     console.error('❌ Error obteniendo ingredientes:', error);
     res.status(500).json({ error: 'Error al obtener ingredientes: ' + error.message });
-  }
-});
-
-app.get('/api/ingredients/public', async (req, res) => {
-  try {
-    const ingredients = await Ingredient.find({ available: true })
-      .sort({ category: 1, order: 1, name: 1 });
-    
-    res.json({
-      message: 'Ingredientes públicos',
-      count: ingredients.length,
-      ingredients: ingredients
-    });
-  } catch (error) {
-    console.error('Error obteniendo ingredientes públicos:', error);
-    res.status(500).json({ error: 'Error al obtener ingredientes' });
   }
 });
 
@@ -392,6 +482,13 @@ app.post('/api/ingredients', auth, async (req, res) => {
     const savedIngredient = await newIngredient.save();
     console.log('✅ Ingrediente creado:', savedIngredient.name);
     
+    // 🆕 NOTIFICAR VÍA WEBSOCKET
+    broadcastToAll({
+      tipo: 'ingrediente_creado',
+      datos: savedIngredient,
+      timestamp: new Date().toISOString()
+    });
+
     res.status(201).json(savedIngredient);
   } catch (error) {
     console.error('❌ Error creando ingrediente:', error);
@@ -416,6 +513,14 @@ app.put('/api/ingredients/:id', auth, async (req, res) => {
     }
     
     console.log('✅ Ingrediente actualizado:', updatedIngredient.name);
+    
+    // 🆕 NOTIFICAR VÍA WEBSOCKET
+    broadcastToAll({
+      tipo: 'ingrediente_actualizado',
+      datos: updatedIngredient,
+      timestamp: new Date().toISOString()
+    });
+
     res.json(updatedIngredient);
   } catch (error) {
     console.error('❌ Error actualizando ingrediente:', error);
@@ -435,6 +540,14 @@ app.delete('/api/ingredients/:id', auth, async (req, res) => {
     }
     
     console.log('✅ Ingrediente eliminado:', deletedIngredient.name);
+    
+    // 🆕 NOTIFICAR VÍA WEBSOCKET
+    broadcastToAll({
+      tipo: 'ingrediente_eliminado',
+      datos: { ingredientId: id },
+      timestamp: new Date().toISOString()
+    });
+
     res.json({ 
       message: 'Ingrediente eliminado exitosamente',
       deletedIngredient: deletedIngredient.name
@@ -445,7 +558,7 @@ app.delete('/api/ingredients/:id', auth, async (req, res) => {
   }
 });
 
-// 🆕 RUTA PARA INICIALIZAR INGREDIENTES POR DEFECTO
+// 🆕 RUTA PARA INICIALIZAR INGREDIENTES - CON WEBSOCKET
 app.post('/api/ingredients/initialize', auth, async (req, res) => {
   try {
     console.log('🔄 Inicializando ingredientes por defecto...');
@@ -483,6 +596,13 @@ app.post('/api/ingredients/initialize', auth, async (req, res) => {
     
     console.log(`✅ ${ingredients.length} ingredientes inicializados`);
     
+    // 🆕 NOTIFICAR VÍA WEBSOCKET
+    broadcastToAll({
+      tipo: 'ingredientes_inicializados',
+      datos: { count: ingredients.length },
+      timestamp: new Date().toISOString()
+    });
+
     res.json({
       message: 'Ingredientes inicializados exitosamente',
       count: ingredients.length,
@@ -494,7 +614,7 @@ app.post('/api/ingredients/initialize', auth, async (req, res) => {
   }
 });
 
-// 🆕 RUTAS DE CONFIGURACIÓN - CORREGIDAS
+// 🆕 RUTAS DE CONFIGURACIÓN - CON WEBSOCKET
 app.get('/api/config/:key', auth, async (req, res) => {
   try {
     const { key } = req.params;
@@ -510,82 +630,6 @@ app.get('/api/config/:key', auth, async (req, res) => {
     res.status(500).json({ error: 'Error al obtener configuración' });
   }
 });
-
-// 🆕 RUTA PÚBLICA PARA CONFIGURACIÓN (PARA EL HTML) - CORREGIDA
-app.get('/api/config/public/:key', async (req, res) => {
-  try {
-    const { key } = req.params;
-    console.log(`📡 Solicitando configuración pública para: ${key}`);
-    
-    const config = await Config.findOne({ key });
-    
-    if (!config) {
-      console.log(`❌ Configuración ${key} no encontrada en BD`);
-      // Devolver valores por defecto en lugar de error 404
-      const defaultConfig = getDefaultConfig(key);
-      return res.json(defaultConfig);
-    }
-    
-    console.log(`✅ Configuración ${key} encontrada:`, config.value);
-    res.json(config.value);
-    
-  } catch (error) {
-    console.error(`❌ Error obteniendo configuración pública ${key}:`, error);
-    // En caso de error, devolver valores por defecto
-    const defaultConfig = getDefaultConfig(key);
-    res.json(defaultConfig);
-  }
-});
-
-// 🆕 FUNCIÓN PARA CONFIGURACIÓN POR DEFECTO
-function getDefaultConfig(key) {
-  console.log(`🔄 Usando configuración por defecto para: ${key}`);
-  
-  switch(key) {
-    case 'horarios':
-      return {
-        lunes: { activo: true, inicio: '09:00', fin: '12:00' },
-        martes: { activo: true, inicio: '12:00', fin: '13:00' },
-        miércoles: { activo: true, inicio: '09:00', fin: '12:00' },
-        jueves: { activo: true, inicio: '12:00', fin: '13:00' },
-        viernes: { activo: true, inicio: '13:00', fin: '14:00' },
-        sábado: { activo: false, inicio: '09:00', fin: '12:00' },
-        domingo: { activo: false, inicio: '09:00', fin: '12:00' }
-      };
-    case 'precios':
-      return {
-        cantidad_15: 20,
-        cantidad_20: 25,
-        cantidad_25: 30,
-        precio_extra: 5,
-        paquetes: {
-          Chocolate: 15,
-          Fitness: 10,
-          Fresita: 10,
-          Lechera: 25,
-          Gansito: 15
-        }
-      };
-    case 'puntos_entrega':
-      return [
-        'Puerta de EMA 1',
-        'Puerta de EMA 2',
-        'Puerta de EMA 3',
-        'Puerta de EMA 4',
-        'Puerta de EMA 5',
-        'Puerta de EMA 6',
-        'Puerta de EMA 7',
-        'Puerta de EMA 8',
-        'Puerta de EMA 9',
-        'Puerta de EMA 10',
-        'Cafetería',
-        'Oxxo',
-        'Lobo'
-      ];
-    default:
-      return {};
-  }
-}
 
 app.put('/api/config/:key', auth, async (req, res) => {
   try {
@@ -606,6 +650,13 @@ app.put('/api/config/:key', auth, async (req, res) => {
       }
     );
     
+    // 🆕 NOTIFICAR VÍA WEBSOCKET
+    broadcastToAll({
+      tipo: 'configuracion_actualizada',
+      datos: config,
+      timestamp: new Date().toISOString()
+    });
+
     res.json({
       message: 'Configuración actualizada',
       config
@@ -616,116 +667,7 @@ app.put('/api/config/:key', auth, async (req, res) => {
   }
 });
 
-// 🆕 RUTA PARA INICIALIZAR CONFIGURACIÓN POR DEFECTO - CORREGIDA
-app.post('/api/config/initialize', auth, async (req, res) => {
-  try {
-    console.log('🔄 Inicializando configuración por defecto...');
-    
-    const defaultConfigs = [
-      {
-        key: 'horarios',
-        value: {
-          lunes: { activo: true, inicio: '09:00', fin: '12:00' },
-          martes: { activo: true, inicio: '12:00', fin: '13:00' },
-          miércoles: { activo: true, inicio: '09:00', fin: '12:00' },
-          jueves: { activo: true, inicio: '12:00', fin: '13:00' },
-          viernes: { activo: true, inicio: '13:00', fin: '14:00' },
-          sábado: { activo: false, inicio: '09:00', fin: '12:00' },
-          domingo: { activo: false, inicio: '09:00', fin: '12:00' }
-        },
-        description: 'Horarios de atención y recogida'
-      },
-      {
-        key: 'precios',
-        value: {
-          cantidad_15: 20,
-          cantidad_20: 25,
-          cantidad_25: 30,
-          precio_extra: 5,
-          paquetes: {
-            Chocolate: 15,
-            Fitness: 10,
-            Fresita: 10,
-            Lechera: 25,
-            Gansito: 15
-          }
-        },
-        description: 'Precios de productos y paquetes'
-      },
-      {
-        key: 'puntos_entrega',
-        value: [
-          'Puerta de EMA 1',
-          'Puerta de EMA 2',
-          'Puerta de EMA 3',
-          'Puerta de EMA 4',
-          'Puerta de EMA 5',
-          'Puerta de EMA 6',
-          'Puerta de EMA 7',
-          'Puerta de EMA 8',
-          'Puerta de EMA 9',
-          'Puerta de EMA 10',
-          'Cafetería',
-          'Oxxo',
-          'Lobo'
-        ],
-        description: 'Puntos de entrega disponibles'
-      }
-    ];
-    
-    await Config.deleteMany({});
-    const configs = await Config.insertMany(defaultConfigs);
-    
-    console.log(`✅ ${configs.length} configuraciones inicializadas`);
-    
-    res.json({
-      message: 'Configuración inicializada exitosamente',
-      count: configs.length,
-      configs
-    });
-  } catch (error) {
-    console.error('❌ Error inicializando configuración:', error);
-    res.status(500).json({ error: 'Error al inicializar configuración' });
-  }
-});
-
-// ✅ RUTA PARA OBTENER PEDIDOS PÚBLICOS (SIN AUTENTICACIÓN)
-app.get('/api/pedidos/public', async (req, res) => {
-  try {
-    const orders = await Order.find().sort({ createdAt: -1 }).limit(50);
-    res.json({
-      message: 'Pedidos públicos',
-      count: orders.length,
-      orders: orders
-    });
-  } catch (error) {
-    console.error('Error obteniendo pedidos públicos:', error);
-    res.status(500).json({ error: 'Error al obtener pedidos' });
-  }
-});
-
-// ✅ RUTA DEBUG PARA TESTING
-app.get('/api/debug', async (req, res) => {
-  try {
-    const orderCount = await Order.countDocuments();
-    const ingredientCount = await Ingredient.countDocuments();
-    const configCount = await Config.countDocuments();
-    const packageCount = await Package.countDocuments();
-    res.json({
-      message: 'Debug endpoint',
-      ordersInDB: orderCount,
-      ingredientsInDB: ingredientCount,
-      configsInDB: configCount,
-      packagesInDB: packageCount,
-      timestamp: new Date().toISOString(),
-      database: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected'
-    });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// 🆕 RUTAS PARA PAQUETES (SIN DUPLICADOS)
+// 🆕 RUTAS PARA PAQUETES - CON WEBSOCKET
 app.get('/api/packages', auth, async (req, res) => {
   try {
     console.log('📦 Obteniendo paquetes...');
@@ -736,23 +678,6 @@ app.get('/api/packages', auth, async (req, res) => {
   } catch (error) {
     console.error('❌ Error obteniendo paquetes:', error);
     res.status(500).json({ error: 'Error al obtener paquetes: ' + error.message });
-  }
-});
-
-app.get('/api/packages/public', async (req, res) => {
-  try {
-    const packages = await Package.find({ available: true })
-      .populate('ingredients')
-      .sort({ order: 1, name: 1 });
-    
-    res.json({
-      message: 'Paquetes públicos',
-      count: packages.length,
-      packages: packages
-    });
-  } catch (error) {
-    console.error('Error obteniendo paquetes públicos:', error);
-    res.status(500).json({ error: 'Error al obtener paquetes' });
   }
 });
 
@@ -778,6 +703,13 @@ app.post('/api/packages', auth, async (req, res) => {
     const savedPackage = await newPackage.save();
     console.log('✅ Paquete creado:', savedPackage.name);
     
+    // 🆕 NOTIFICAR VÍA WEBSOCKET
+    broadcastToAll({
+      tipo: 'paquete_creado',
+      datos: savedPackage,
+      timestamp: new Date().toISOString()
+    });
+
     res.status(201).json(savedPackage);
   } catch (error) {
     console.error('❌ Error creando paquete:', error);
@@ -802,6 +734,14 @@ app.put('/api/packages/:id', auth, async (req, res) => {
     }
     
     console.log('✅ Paquete actualizado:', updatedPackage.name);
+    
+    // 🆕 NOTIFICAR VÍA WEBSOCKET
+    broadcastToAll({
+      tipo: 'paquete_actualizado',
+      datos: updatedPackage,
+      timestamp: new Date().toISOString()
+    });
+
     res.json(updatedPackage);
   } catch (error) {
     console.error('❌ Error actualizando paquete:', error);
@@ -821,6 +761,14 @@ app.delete('/api/packages/:id', auth, async (req, res) => {
     }
     
     console.log('✅ Paquete eliminado:', deletedPackage.name);
+    
+    // 🆕 NOTIFICAR VÍA WEBSOCKET
+    broadcastToAll({
+      tipo: 'paquete_eliminado',
+      datos: { packageId: id },
+      timestamp: new Date().toISOString()
+    });
+
     res.json({ 
       message: 'Paquete eliminado exitosamente',
       deletedPackage: deletedPackage.name
@@ -831,7 +779,7 @@ app.delete('/api/packages/:id', auth, async (req, res) => {
   }
 });
 
-// 🆕 RUTA PARA INICIALIZAR PAQUETES POR DEFECTO
+// 🆕 RUTA PARA INICIALIZAR PAQUETES - CON WEBSOCKET
 app.post('/api/packages/initialize', auth, async (req, res) => {
   try {
     console.log('🔄 Inicializando paquetes por defecto...');
@@ -902,6 +850,13 @@ app.post('/api/packages/initialize', auth, async (req, res) => {
     
     console.log(`✅ ${packages.length} paquetes inicializados`);
     
+    // 🆕 NOTIFICAR VÍA WEBSOCKET
+    broadcastToAll({
+      tipo: 'paquetes_inicializados',
+      datos: { count: packages.length },
+      timestamp: new Date().toISOString()
+    });
+
     res.json({
       message: 'Paquetes inicializados exitosamente',
       count: packages.length,
@@ -931,10 +886,11 @@ app.use((error, req, res, next) => {
   });
 });
 
-// ✅ INICIAR SERVIDOR
-app.listen(PORT, '0.0.0.0', () => {
-  console.log(`🚀 Servidor Nabi Backend iniciado en puerto ${PORT}`);
+// ✅ INICIAR SERVIDOR CON WEBSOCKETS
+server.listen(PORT, '0.0.0.0', () => {
+  console.log(`🚀 Servidor Nabi Backend con WebSockets iniciado en puerto ${PORT}`);
   console.log(`🌐 URL: http://localhost:${PORT}`);
+  console.log(`🔗 WebSockets: ws://localhost:${PORT}`);
   console.log(`📊 Entorno: ${process.env.NODE_ENV || 'development'}`);
   console.log(`✅ CORS configurado de forma robusta`);
 });
