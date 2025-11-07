@@ -14,8 +14,8 @@ const OrderSchema = new mongoose.Schema({
   package: {
     type: String,
     required: true,
-    enum: ['Fitness', 'Chocolate', 'Lechera', 'Fresita', 'Gansito', 'personalizado'],
     default: 'Chocolate'
+    // ⬅️ SE ELIMINÓ LA LÍNEA DEL ENUM
   },
   liquidos: [{
     type: String,
